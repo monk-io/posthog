@@ -7,7 +7,15 @@ import { TaxonomicFilterGroupType } from 'lib/components/TaxonomicFilter/types'
 import { urls } from 'scenes/urls'
 
 import { groupsModel } from '~/models/groupsModel'
-import { DataTableNode, HogQLQuery, LLMTrace, NodeKind, TraceQuery, TracesQuery } from '~/queries/schema/schema-general'
+import {
+    DataTableNode,
+    HogQLQuery,
+    LLMTrace,
+    NodeKind,
+    RefreshType,
+    TraceQuery,
+    TracesQuery,
+} from '~/queries/schema/schema-general'
 import { PropertyFilterType, PropertyOperator } from '~/types'
 
 import sessionsQueryTemplate from '../../backend/queries/sessions.sql?raw'
@@ -232,9 +240,10 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
         sessions: [
             [] as SessionListRow[],
             {
-                loadSessions: async (): Promise<SessionListRow[]> => {
+                loadSessions: async (payload?: { refresh?: RefreshType }): Promise<SessionListRow[]> => {
                     const source = values.sessionsQuery.source as HogQLQuery
-                    const response = await api.query(source)
+                    // Default loads use cache (fast, PostHog convention); the Refresh button forces a recompute
+                    const response = await api.query(source, { refresh: payload?.refresh })
                     const columns = (response.columns ?? []) as string[]
                     const at = (name: string): number => columns.indexOf(name)
                     const rows = (response.results ?? []) as unknown[][]
