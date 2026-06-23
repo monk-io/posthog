@@ -12,7 +12,7 @@ import { TraceBarKind, buildTraceTimeline } from './buildTraceTimeline'
 
 const KIND_CLASS: Record<TraceBarKind, string> = {
     generation: 'bg-success',
-    span: 'bg-primary',
+    span: 'bg-brand-blue',
     embedding: 'bg-warning',
     other: 'bg-muted',
 }
