@@ -4,16 +4,19 @@ import { cn } from 'lib/utils/css-classes'
 
 // A session-replay-style scrubber: a single track with a progress fill, turn
 // ticks, and a draggable playhead. Clicking/dragging seeks; clicking a tick
-// jumps to that turn.
+// jumps to that moment. Two tick kinds: the user's request (muted) and the
+// assistant's response (green), so each turn reads as request → response.
 export function SessionSeekbar({
     durationMs,
     currentMs,
     turnStartsMs,
+    turnResponsesMs,
     onSeek,
 }: {
     durationMs: number
     currentMs: number
     turnStartsMs: number[]
+    turnResponsesMs: number[]
     onSeek: (ms: number) => void
 }): JSX.Element {
     const trackRef = useRef<HTMLDivElement>(null)
@@ -30,6 +33,25 @@ export function SessionSeekbar({
 
     const at = (ms: number): number => (durationMs > 0 ? (ms / durationMs) * 100 : 0)
     const progressPct = at(currentMs)
+
+    const tick = (ms: number, kind: 'request' | 'response', i: number): JSX.Element => (
+        <button
+            key={`${kind}-${i}`}
+            type="button"
+            aria-label={`Jump to turn ${i + 1} ${kind}`}
+            title={`Turn ${i + 1} · ${kind}`}
+            onClick={(e) => {
+                e.stopPropagation()
+                onSeek(ms)
+            }}
+            className={cn(
+                'absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-3.5 rounded-full hover:bg-default',
+                kind === 'request' ? 'bg-muted' : 'bg-success'
+            )}
+            // eslint-disable-next-line react/forbid-dom-props
+            style={{ left: `${at(ms)}%` }}
+        />
+    )
 
     return (
         <div
@@ -51,20 +73,8 @@ export function SessionSeekbar({
                 // eslint-disable-next-line react/forbid-dom-props
                 style={{ width: `${progressPct}%` }}
             />
-            {turnStartsMs.map((startMs, i) => (
-                <button
-                    key={i}
-                    type="button"
-                    aria-label={`Jump to turn ${i + 1}`}
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        onSeek(startMs)
-                    }}
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-3.5 rounded-full bg-muted hover:bg-default"
-                    // eslint-disable-next-line react/forbid-dom-props
-                    style={{ left: `${at(startMs)}%` }}
-                />
-            ))}
+            {turnStartsMs.map((ms, i) => tick(ms, 'request', i))}
+            {turnResponsesMs.map((ms, i) => tick(ms, 'response', i))}
             <div
                 className={cn(
                     'absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-accent shadow'
