@@ -1,6 +1,6 @@
 import { BindLogic, useActions, useValues } from 'kea'
 import { combineUrl, router } from 'kea-router'
-import { Suspense, lazy, useEffect } from 'react'
+import { type ReactNode, Suspense, lazy, useEffect, useMemo, useState } from 'react'
 
 import { IconChevronRight, IconWrench } from '@posthog/icons'
 import { LemonButton, LemonTag, Spinner, SpinnerOverlay, Tooltip } from '@posthog/lemon-ui'
@@ -10,6 +10,7 @@ import { TZLabel } from 'lib/components/TZLabel'
 import { FEATURE_FLAGS } from 'lib/constants'
 import { dayjs } from 'lib/dayjs'
 import { LemonSkeleton } from 'lib/lemon-ui/LemonSkeleton'
+import { lemonToast } from 'lib/lemon-ui/LemonToast'
 import { Link } from 'lib/lemon-ui/Link'
 import { featureFlagLogic } from 'lib/logic/featureFlagLogic'
 import { useAttachedLogic } from 'lib/logic/scenes/useAttachedLogic'
@@ -216,38 +217,13 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                 )}
             </header>
 
-            {durationMs > 0 && (
-                <div className="flex flex-col gap-2 border rounded p-3 bg-surface-primary">
-                    <SessionSeekbar
-                        durationMs={durationMs}
-                        currentMs={currentMs}
-                        turnStartsMs={built.turnStartsMs}
-                        turnResponsesMs={built.turnResponsesMs}
-                        onSeek={seek}
-                    />
-                    <div className="flex items-center gap-3 text-[11px] text-muted">
-                        <span className="flex items-center gap-1">
-                            <span className="w-1 h-3 rounded-full bg-muted" /> Request
-                        </span>
-                        <span className="flex items-center gap-1">
-                            <span className="w-1 h-3 rounded-full bg-success" /> Response
-                        </span>
-                    </div>
-                    <SessionPlayerControls
-                        playing={playing}
-                        speed={speed}
-                        currentMs={currentMs}
-                        durationMs={durationMs}
-                        onTogglePlay={togglePlay}
-                        onSetSpeed={setSpeed}
-                    />
-                </div>
-            )}
             <div className="flex flex-col">
                 {(isScrubbing ? sessionTurns.slice(0, revealedTurnCount) : sessionTurns).map((turn, i) => (
                     <SessionTurnView
                         key={turn.trace.id}
                         turn={turn}
+                        turnIndex={i}
+                        allTurns={sessionTurns}
                         phase={isScrubbing ? phaseOf(i) : 'complete'}
                         showSentiment={showSentiment}
                         showSessionSummarization={!!showSessionSummarization}
@@ -267,6 +243,36 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                     </div>
                 )}
             </div>
+
+            {/* The player anchors to the bottom like a session-replay scrubber, so it
+                stays in reach while the conversation reveals and scrolls above it. */}
+            {durationMs > 0 && (
+                <div className="sticky bottom-0 z-10 mt-2 flex flex-col gap-2 rounded border border-primary bg-surface-primary p-3 shadow">
+                    <SessionSeekbar
+                        durationMs={durationMs}
+                        currentMs={currentMs}
+                        turnStartsMs={built.turnStartsMs}
+                        turnResponsesMs={built.turnResponsesMs}
+                        onSeek={seek}
+                    />
+                    <div className="flex items-center gap-3 text-[11px] text-muted">
+                        <span className="flex items-center gap-1">
+                            <span className="w-1 h-3 rounded-full bg-muted" /> User
+                        </span>
+                        <span className="flex items-center gap-1">
+                            <span className="w-1 h-3 rounded-full bg-success" /> Assistant
+                        </span>
+                    </div>
+                    <SessionPlayerControls
+                        playing={playing}
+                        speed={speed}
+                        currentMs={currentMs}
+                        durationMs={durationMs}
+                        onTogglePlay={togglePlay}
+                        onSetSpeed={setSpeed}
+                    />
+                </div>
+            )}
         </div>
     )
 }
@@ -320,12 +326,16 @@ function SummarizeAllButton({
 
 function SessionTurnView({
     turn,
+    turnIndex,
+    allTurns,
     phase = 'complete',
     showSentiment,
     showSessionSummarization,
     traceSearchParams,
 }: {
     turn: SessionTurn
+    turnIndex: number
+    allTurns: SessionTurn[]
     phase?: TurnPhase
     showSentiment: boolean
     showSessionSummarization: boolean
@@ -335,6 +345,7 @@ function SessionTurnView({
         aiObservabilitySessionDataLogic
     )
     const { toggleSteps, toggleGenerationExpanded, loadFullTrace } = useActions(aiObservabilitySessionDataLogic)
+    const [traceLinksShown, setTraceLinksShown] = useState(false)
 
     const trace = turn.trace
     const summary: TraceSummary | undefined = traceSummaries[trace.id]
@@ -408,30 +419,45 @@ function SessionTurnView({
                         </div>
                     )}
 
-                    {/* Steps live under the assistant's response as a small disclosure —
-                        the agent's intermediate work, one click away when wanted. */}
+                    {/* Per-turn actions sit under the assistant's response as small
+                        disclosures — the agent's work and trace, one click away. */}
                     {isComplete && hasTranscript && (
-                        <div className="flex flex-col gap-1.5 text-xs text-muted">
-                            <button
-                                type="button"
-                                className="flex items-center gap-1 self-start hover:text-default cursor-pointer"
-                                onClick={() => {
+                        <div className="flex flex-col gap-1.5">
+                            <TurnDisclosure
+                                label={stepsShown ? 'Hide steps' : 'Show steps'}
+                                expanded={stepsShown}
+                                onToggle={() => {
                                     if (!stepsShown && !fullTrace && !isLoading) {
                                         loadFullTrace(trace.id)
                                     }
                                     toggleSteps(trace.id)
                                 }}
                             >
-                                <IconChevronRight className={cn('transition-transform', stepsShown && 'rotate-90')} />
-                                <span>{stepsShown ? 'Hide steps' : 'Show steps'}</span>
-                            </button>
-                            {stepsShown && (
                                 <StepsPanel
                                     traceId={trace.id}
                                     fullTrace={fullTrace}
                                     expandedEventIds={expandedGenerationIds}
                                     onToggleEventExpand={toggleGenerationExpanded}
                                 />
+                            </TurnDisclosure>
+
+                            <TurnDisclosure
+                                label="View trace"
+                                expanded={traceLinksShown}
+                                onToggle={() => setTraceLinksShown((v) => !v)}
+                            >
+                                <div className="flex flex-col gap-1 items-start pl-4">
+                                    <Link to={traceUrl} target="_blank" className="text-xs">
+                                        Open trace
+                                    </Link>
+                                    <Link to={summaryUrl} target="_blank" className="text-xs">
+                                        View summary
+                                    </Link>
+                                </div>
+                            </TurnDisclosure>
+
+                            {turn.outputs.length > 0 && (
+                                <TurnIntoEvalDisclosure turn={turn} turnIndex={turnIndex} allTurns={allTurns} />
                             )}
                         </div>
                     )}
@@ -446,22 +472,81 @@ function SessionTurnView({
                     )}
                 </div>
 
-                <div className="w-40 shrink-0 flex flex-col gap-1 text-xs text-muted">
-                    {isComplete && (
-                        <>
-                            {showSentiment && (
-                                <SessionTraceSentimentBar traceId={trace.id} createdAt={trace.createdAt} />
-                            )}
-                            <div className="flex flex-col gap-1 items-start">
-                                <Link to={traceUrl} target="_blank" className="text-xs">
-                                    Open trace
-                                </Link>
-                            </div>
-                        </>
-                    )}
-                </div>
+                {isComplete && showSentiment && (
+                    <div className="w-40 shrink-0 flex flex-col gap-1 text-xs text-muted">
+                        <SessionTraceSentimentBar traceId={trace.id} createdAt={trace.createdAt} />
+                    </div>
+                )}
             </div>
         </div>
+    )
+}
+
+// A small chevron disclosure matching the conversation's other inline controls:
+// a muted label that rotates a caret open and reveals its content below.
+function TurnDisclosure({
+    label,
+    expanded,
+    onToggle,
+    children,
+}: {
+    label: string
+    expanded: boolean
+    onToggle: () => void
+    children: ReactNode
+}): JSX.Element {
+    return (
+        <div className="flex flex-col gap-1.5 text-xs text-muted">
+            <button
+                type="button"
+                className="flex items-center gap-1 self-start hover:text-default cursor-pointer"
+                onClick={onToggle}
+            >
+                <IconChevronRight className={cn('transition-transform', expanded && 'rotate-90')} />
+                <span>{label}</span>
+            </button>
+            {expanded && children}
+        </div>
+    )
+}
+
+// Mock: previews turning an assistant response (plus everything before it) into an
+// evaluation case. The capture isn't wired up yet — this just demonstrates the flow.
+function TurnIntoEvalDisclosure({
+    turn,
+    turnIndex,
+    allTurns,
+}: {
+    turn: SessionTurn
+    turnIndex: number
+    allTurns: SessionTurn[]
+}): JSX.Element {
+    const [expanded, setExpanded] = useState(false)
+    // Everything the eval would treat as input: every message before this turn's
+    // response — all prior turns plus this turn's own request.
+    const contextCount = useMemo(
+        () =>
+            allTurns.slice(0, turnIndex).reduce((n, t) => n + t.newInputs.length + t.outputs.length, 0) +
+            turn.newInputs.length,
+        [allTurns, turnIndex, turn.newInputs.length]
+    )
+    const messages = contextCount === 1 ? 'message' : 'messages'
+    const createEval = (): void => {
+        lemonToast.success(`Evaluation created from this response and ${contextCount} ${messages} of context (mock)`)
+        setExpanded(false)
+    }
+    return (
+        <TurnDisclosure label="Turn into eval" expanded={expanded} onToggle={() => setExpanded((v) => !v)}>
+            <div className="flex flex-col gap-2 items-start pl-4">
+                <span>
+                    Turns the assistant's response and the {contextCount} {messages} of context before it into an
+                    evaluation case.
+                </span>
+                <LemonButton type="primary" size="xsmall" onClick={createEval}>
+                    Create evaluation
+                </LemonButton>
+            </div>
+        </TurnDisclosure>
     )
 }
 
