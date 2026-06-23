@@ -3,6 +3,7 @@ import { AnyPropertyFilter } from '~/types'
 import { LLMProvider } from '../settings/llmProviderKeysLogic'
 
 export type EvaluationType = 'llm_judge' | 'hog' | 'sentiment'
+export type EvaluationTarget = 'generation' | 'trace'
 export type EvaluationOutputType = 'boolean' | 'sentiment'
 export type EvaluationStatus = 'active' | 'paused' | 'error'
 export type EvaluationStatusReason =
@@ -20,6 +21,11 @@ export interface ModelConfiguration {
 
 export interface EvaluationOutputConfig {
     allows_na?: boolean
+}
+
+export interface EvaluationTargetConfig {
+    /** For 'trace' target: seconds to wait after the first matching generation before evaluating the trace. */
+    window_seconds?: number
 }
 
 export interface LLMJudgeEvaluationConfig {
@@ -45,6 +51,10 @@ export interface BaseEvaluationConfig {
     output_type: EvaluationOutputType
     output_config: EvaluationOutputConfig
     conditions: EvaluationConditionSet[]
+    /** What the evaluation runs on: each matching generation event, or the whole trace once. */
+    target: EvaluationTarget
+    /** Target-specific settings. For 'trace': {window_seconds}. Empty for 'generation'. */
+    target_config: EvaluationTargetConfig
     model_configuration: ModelConfiguration | null
     total_runs: number
     last_run_at?: string
