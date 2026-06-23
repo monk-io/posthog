@@ -176,7 +176,7 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
     }
 
     return (
-        <div className="relative flex flex-col gap-4 max-w-[75rem]">
+        <div className="relative flex flex-col gap-4 max-w-[75rem] min-h-full">
             {showBreadcrumb && <SceneBreadcrumbBackButton />}
             {titleLoading ? (
                 <LemonSkeleton className="h-8 w-96 max-w-full" />
@@ -217,7 +217,7 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                 )}
             </header>
 
-            <div className="flex flex-col">
+            <div className="flex flex-col flex-1">
                 {(isScrubbing ? sessionTurns.slice(0, revealedTurnCount) : sessionTurns).map((turn, i) => (
                     <SessionTurnView
                         key={turn.trace.id}
