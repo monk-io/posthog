@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { IconChevronDown } from '@posthog/icons'
 import { LemonButton, Tooltip } from '@posthog/lemon-ui'
 
-import { humanFriendlyMilliseconds } from 'lib/utils/durations'
 import { cn } from 'lib/utils/css-classes'
+import { humanFriendlyMilliseconds } from 'lib/utils/durations'
 
 import { LLMTraceEvent } from '~/queries/schema/schema-general'
 
