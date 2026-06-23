@@ -30,6 +30,7 @@ import { AIObservabilityTraceEvents } from './components/AIObservabilityTraceEve
 import { SentimentBar } from './components/SentimentTag'
 import { SessionPlayerControls } from './components/SessionPlayer/SessionPlayerControls'
 import { SessionSeekbar } from './components/SessionPlayer/SessionSeekbar'
+import { TypingIndicator } from './components/SessionPlayer/TypingIndicator'
 import { TranscriptBubbleStream } from './ConversationDisplay/TranscriptBubbleStream'
 import { SessionTurn } from './extractSessionTurns'
 import { llmSentimentLazyLoaderLogic } from './llmSentimentLazyLoaderLogic'
@@ -215,15 +216,18 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                 </div>
             )}
             <div className="flex flex-col">
-                {(playing || currentMs > 0 ? sessionTurns.slice(0, visibleTurnIndex + 1) : sessionTurns).map((turn) => (
-                    <SessionTurnView
-                        key={turn.trace.id}
-                        turn={turn}
-                        showSentiment={showSentiment}
-                        showSessionSummarization={!!showSessionSummarization}
-                        traceSearchParams={traceSearchParams}
-                    />
-                ))}
+                {(playing || currentMs > 0 ? sessionTurns.slice(0, visibleTurnIndex + 1) : sessionTurns).map(
+                    (turn, i) => (
+                        <SessionTurnView
+                            key={turn.trace.id}
+                            turn={turn}
+                            thinking={(playing || currentMs > 0) && currentMs < built.turnResponsesMs[i]}
+                            showSentiment={showSentiment}
+                            showSessionSummarization={!!showSessionSummarization}
+                            traceSearchParams={traceSearchParams}
+                        />
+                    )
+                )}
                 {hasMoreData && (
                     <div className="flex justify-center pt-4">
                         <LemonButton
@@ -290,11 +294,13 @@ function SummarizeAllButton({
 
 function SessionTurnView({
     turn,
+    thinking = false,
     showSentiment,
     showSessionSummarization,
     traceSearchParams,
 }: {
     turn: SessionTurn
+    thinking?: boolean
     showSentiment: boolean
     showSessionSummarization: boolean
     traceSearchParams: Record<string, unknown>
@@ -330,13 +336,18 @@ function SessionTurnView({
             </div>
             <div className="flex gap-10 pb-4">
                 <div className="flex-1 min-w-0 flex flex-col gap-2">
-                    {showSessionSummarization && summary && (
+                    {!thinking && showSessionSummarization && summary && (
                         <TurnSummaryLine summary={summary} summaryUrl={summaryUrl} />
                     )}
 
-                    <TurnBody turn={turn} isLoading={isLoading} onLoad={() => loadFullTrace(trace.id)} />
+                    <TurnBody
+                        turn={turn}
+                        thinking={thinking}
+                        isLoading={isLoading}
+                        onLoad={() => loadFullTrace(trace.id)}
+                    />
 
-                    {turn.tools.length > 0 && (
+                    {!thinking && turn.tools.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted">
                             <IconWrench className="text-sm shrink-0" />
                             {turn.tools.map((name) => (
@@ -347,7 +358,7 @@ function SessionTurnView({
                         </div>
                     )}
 
-                    {(trace.errorCount ?? 0) > 0 && (
+                    {!thinking && (trace.errorCount ?? 0) > 0 && (
                         <div className="flex items-center gap-2 min-w-0">
                             <LemonTag type="danger" size="small" className="shrink-0">
                                 {trace.errorCount === 1 ? '1 error' : `${trace.errorCount} errors`}
@@ -373,7 +384,7 @@ function SessionTurnView({
                         </div>
                     )}
 
-                    {showStepsPanel && (
+                    {!thinking && showStepsPanel && (
                         <StepsPanel
                             traceId={trace.id}
                             fullTrace={fullTrace}
@@ -426,10 +437,12 @@ function TurnSummaryLine({ summary, summaryUrl }: { summary: TraceSummary; summa
 
 function TurnBody({
     turn,
+    thinking = false,
     isLoading,
     onLoad,
 }: {
     turn: SessionTurn
+    thinking?: boolean
     isLoading: boolean
     onLoad: () => void
 }): JSX.Element | null {
@@ -453,6 +466,16 @@ function TurnBody({
     if (!turn.userVisibleTurn) {
         // No chat to render — the parent renders `StepsPanel` inline below as the substitute.
         return null
+    }
+    // During playback the response is still "in flight" — show just the request plus
+    // a typing indicator until the AI latency window elapses.
+    if (thinking) {
+        return (
+            <div className="flex flex-col gap-1.5">
+                <TranscriptBubbleStream inputs={turn.newInputs} outputs={[]} />
+                <TypingIndicator />
+            </div>
+        )
     }
     // `turn.newInputs` / `outputs` come pre-deduped from `extractSessionTurns`.
     return <TranscriptBubbleStream inputs={turn.newInputs} outputs={turn.outputs} />

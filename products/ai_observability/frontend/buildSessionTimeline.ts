@@ -4,39 +4,42 @@ import { SessionTurn } from './extractSessionTurns'
 // minutes later) are compressed so playback stays watchable — same idea as
 // session replay's inactivity skipping.
 export const IDLE_CAP_MS = 3000
-const MIN_TURN_MS = 400
+const MIN_THINK_MS = 600
+const THINK_CAP_MS = 12000
 
 export interface SessionTimelineData {
+    // when the user's request appears (turn start; long idle gaps between turns are compressed)
     turnStartsMs: number[]
+    // when the assistant's response appears (= request + the AI "thinking"/latency window)
+    turnResponsesMs: number[]
     durationMs: number
 }
 
 export function buildSessionTimeline(turns: SessionTurn[]): SessionTimelineData {
     if (!turns.length) {
-        return { turnStartsMs: [], durationMs: 0 }
+        return { turnStartsMs: [], turnResponsesMs: [], durationMs: 0 }
     }
 
     const rawStarts = turns.map((t) => new Date(t.trace.createdAt).getTime())
-    const durations = turns.map((t) => Math.max(Math.round((t.trace.totalLatency ?? 0) * 1000), MIN_TURN_MS))
+    const latencies = turns.map((t) => Math.round((t.trace.totalLatency ?? 0) * 1000))
 
     const turnStartsMs: number[] = []
-    let compressedCursor = 0
-    let prevRawEnd = rawStarts[0]
-
+    const turnResponsesMs: number[] = []
+    let cursor = 0
     turns.forEach((_, i) => {
-        if (i === 0) {
-            turnStartsMs.push(0)
-            compressedCursor = durations[0]
-            prevRawEnd = rawStarts[0] + durations[0]
-            return
+        if (i > 0) {
+            // user read/think/type time between the previous response and this request, capped
+            const rawIdle = Math.max(rawStarts[i] - (rawStarts[i - 1] + latencies[i - 1]), 0)
+            cursor += Math.min(rawIdle, IDLE_CAP_MS)
         }
-        const rawGap = Math.max(rawStarts[i] - prevRawEnd, 0)
-        const cappedGap = Math.min(rawGap, IDLE_CAP_MS)
-        const start = compressedCursor + cappedGap
-        turnStartsMs.push(start)
-        compressedCursor = start + durations[i]
-        prevRawEnd = rawStarts[i] + durations[i]
+        const userMs = cursor
+        // the AI "thinking" window — kept real so latency is felt, but floored (always visible)
+        // and capped (so a pathologically long call doesn't stall playback)
+        const thinkMs = Math.min(Math.max(latencies[i], MIN_THINK_MS), THINK_CAP_MS)
+        turnStartsMs.push(userMs)
+        turnResponsesMs.push(userMs + thinkMs)
+        cursor = userMs + thinkMs
     })
 
-    return { turnStartsMs, durationMs: compressedCursor }
+    return { turnStartsMs, turnResponsesMs, durationMs: cursor }
 }
