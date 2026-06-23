@@ -10,9 +10,11 @@ import { LLMTraceEvent } from '~/queries/schema/schema-general'
 
 import { TraceBarKind, buildTraceTimeline } from './buildTraceTimeline'
 
+// Mirror the trace tree's EventTypeTag colors: generation green, embedding amber,
+// span neutral (transparent + light border, like the tree's default tag).
 const KIND_CLASS: Record<TraceBarKind, string> = {
     generation: 'bg-success',
-    span: 'bg-brand-blue',
+    span: 'border border-primary',
     embedding: 'bg-warning',
     other: 'bg-muted',
 }
@@ -62,8 +64,10 @@ export function TraceTimeline({
                                         type="button"
                                         onClick={() => onSelectEvent(bar.id)}
                                         className={cn(
-                                            'absolute top-1/2 -translate-y-1/2 h-5 rounded-sm cursor-pointer flex items-center overflow-hidden text-white',
+                                            'absolute top-1/2 -translate-y-1/2 h-5 rounded-sm cursor-pointer flex items-center overflow-hidden',
                                             KIND_CLASS[bar.kind],
+                                            // solid bars get white text; the neutral span bar keeps the default dark text
+                                            bar.kind !== 'span' && 'text-white',
                                             bar.isError && 'ring-2 ring-danger',
                                             selected && 'outline outline-2 outline-offset-1 outline-purple'
                                         )}
