@@ -19,6 +19,9 @@ const KIND_CLASS: Record<TraceBarKind, string> = {
     other: 'bg-muted',
 }
 
+// Per-lane row height (px): overlapping bars stack into lanes instead of colliding.
+const ROW_H = 24
+
 export function TraceTimeline({
     events,
     selectedEventId,
@@ -29,7 +32,7 @@ export function TraceTimeline({
     onSelectEvent: (id: string) => void
 }): JSX.Element | null {
     const [collapsed, setCollapsed] = useState(false)
-    const { bars, totalMs } = buildTraceTimeline(events)
+    const { bars, totalMs, laneCount } = buildTraceTimeline(events)
 
     if (!bars.length || totalMs <= 0) {
         return null
@@ -53,7 +56,11 @@ export function TraceTimeline({
             </div>
             {!collapsed && (
                 <>
-                    <div className="relative h-6 mx-3">
+                    <div
+                        className="relative mx-3"
+                        // eslint-disable-next-line react/forbid-dom-props
+                        style={{ height: laneCount * ROW_H }}
+                    >
                         {bars.map((bar) => {
                             const widthPct = Math.max(pct(bar.durationMs), 0.5)
                             const selected = selectedEventId === bar.id
@@ -64,7 +71,7 @@ export function TraceTimeline({
                                         type="button"
                                         onClick={() => onSelectEvent(bar.id)}
                                         className={cn(
-                                            'absolute top-1/2 -translate-y-1/2 h-5 rounded-sm cursor-pointer flex items-center overflow-hidden',
+                                            'absolute h-5 rounded-sm cursor-pointer flex items-center overflow-hidden',
                                             KIND_CLASS[bar.kind],
                                             // solid bars get white text; the neutral span bar keeps the default dark text
                                             bar.kind !== 'span' && 'text-white',
@@ -72,7 +79,11 @@ export function TraceTimeline({
                                             selected && 'outline outline-2 outline-offset-1 outline-purple'
                                         )}
                                         // eslint-disable-next-line react/forbid-dom-props
-                                        style={{ left: `${pct(bar.startMs)}%`, width: `${widthPct}%` }}
+                                        style={{
+                                            left: `${pct(bar.startMs)}%`,
+                                            width: `${widthPct}%`,
+                                            top: bar.lane * ROW_H + 2,
+                                        }}
                                         data-attr="trace-timeline-bar"
                                     >
                                         {widthPct > 5 ? (

@@ -9,11 +9,15 @@ export interface TraceTimelineBar {
     durationMs: number
     kind: TraceBarKind
     isError: boolean
+    // Row index: overlapping/nested events stack into separate lanes so their
+    // bars and labels never collide on a shared row.
+    lane: number
 }
 
 export interface TraceTimelineData {
     bars: TraceTimelineBar[]
     totalMs: number
+    laneCount: number
 }
 
 function kindOf(event: string): TraceBarKind {
@@ -36,7 +40,7 @@ function labelOf(event: LLMTraceEvent): string {
 
 export function buildTraceTimeline(events: LLMTraceEvent[]): TraceTimelineData {
     if (!events.length) {
-        return { bars: [], totalMs: 0 }
+        return { bars: [], totalMs: 0, laneCount: 0 }
     }
 
     const times = events.map((e) => new Date(e.createdAt).getTime())
@@ -57,9 +61,24 @@ export function buildTraceTimeline(events: LLMTraceEvent[]): TraceTimelineData {
             durationMs,
             kind: kindOf(event.event),
             isError: !!event.properties?.$ai_is_error,
+            lane: 0,
         }
     })
 
+    // Greedy lane packing: walk bars in start order and drop each into the first
+    // lane whose previous bar has already ended. Non-overlapping bars share a lane
+    // (stays compact); a nested span lands in its own lane instead of colliding.
+    const laneEnds: number[] = []
+    for (const i of [...bars.keys()].sort((a, b) => bars[a].startMs - bars[b].startMs)) {
+        const bar = bars[i]
+        let lane = laneEnds.findIndex((end) => end <= bar.startMs)
+        if (lane === -1) {
+            lane = laneEnds.length
+        }
+        laneEnds[lane] = bar.startMs + bar.durationMs
+        bar.lane = lane
+    }
+
     const totalMs = Math.max(...bars.map((b) => b.startMs + b.durationMs), 0)
-    return { bars, totalMs }
+    return { bars, totalMs, laneCount: Math.max(laneEnds.length, 1) }
 }
