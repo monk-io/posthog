@@ -37,7 +37,7 @@ import { AccessControlLevel, AccessControlResourceType, DashboardPlacement, Even
 import { aiObservabilityColumnRenderers } from './aiObservabilityColumnRenderers'
 import { AIObservabilityErrors } from './AIObservabilityErrors'
 import { AIObservabilityReloadAction } from './AIObservabilityReloadAction'
-import { AIObservabilitySessionsScene } from './AIObservabilitySessionsScene'
+import { AIObservabilitySessionsPlaylist } from './AIObservabilitySessionsPlaylist'
 import { AIObservabilitySetupPrompt } from './AIObservabilitySetupPrompt'
 import {
     buildApplyUrlStatePayload,
@@ -599,7 +599,8 @@ function AIObservabilitySceneContent(): JSX.Element {
             label: 'Sessions',
             content: (
                 <AIObservabilitySetupPrompt>
-                    <AIObservabilitySessionsScene />
+                    <Filters />
+                    <AIObservabilitySessionsPlaylist />
                 </AIObservabilitySetupPrompt>
             ),
             link: combineUrl(urls.aiObservabilitySessions(), searchParams).url,

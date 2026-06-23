@@ -1,10 +1,13 @@
 import { actions, connect, kea, listeners, path, props, reducers, selectors } from 'kea'
+import { loaders } from 'kea-loaders'
+import { actionToUrl, combineUrl, router, urlToAction } from 'kea-router'
 
 import api from 'lib/api'
 import { TaxonomicFilterGroupType } from 'lib/components/TaxonomicFilter/types'
+import { urls } from 'scenes/urls'
 
 import { groupsModel } from '~/models/groupsModel'
-import { DataTableNode, LLMTrace, NodeKind, TraceQuery, TracesQuery } from '~/queries/schema/schema-general'
+import { DataTableNode, HogQLQuery, LLMTrace, NodeKind, TraceQuery, TracesQuery } from '~/queries/schema/schema-general'
 import { PropertyFilterType, PropertyOperator } from '~/types'
 
 import sessionsQueryTemplate from '../../backend/queries/sessions.sql?raw'
@@ -12,6 +15,16 @@ import { SortDirection, SortState, aiObservabilitySharedLogic } from '../aiObser
 import type { aiObservabilitySessionsViewLogicType } from './aiObservabilitySessionsViewLogicType'
 
 export type AIObservabilitySessionsViewLogicProps = Record<string, never>
+
+export interface SessionListRow {
+    sessionId: string
+    distinctId: string
+    traces: number
+    totalCost: number
+    totalLatency: number
+    errors: number
+    lastSeen: string
+}
 
 export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewLogicType>([
     path(['products', 'ai_observability', 'frontend', 'tabs', 'aiObservabilitySessionsViewLogic']),
@@ -31,6 +44,7 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
 
     actions({
         setSessionsSort: (column: string, direction: SortDirection) => ({ column, direction }),
+        selectSession: (sessionId: string | null) => ({ sessionId }),
         toggleSessionExpanded: (sessionId: string) => ({ sessionId }),
         toggleTraceExpanded: (traceId: string) => ({ traceId }),
         toggleGenerationExpanded: (uuid: string, traceId: string) => ({ uuid, traceId }),
@@ -43,6 +57,12 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
     }),
 
     reducers({
+        selectedSessionId: [
+            null as string | null,
+            {
+                selectSession: (_, { sessionId }) => sessionId,
+            },
+        ],
         sessionsSort: [
             { column: 'last_seen', direction: 'DESC' } as SortState,
             {
@@ -208,7 +228,33 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
         ],
     }),
 
+    loaders(({ values }) => ({
+        sessions: [
+            [] as SessionListRow[],
+            {
+                loadSessions: async (): Promise<SessionListRow[]> => {
+                    const source = values.sessionsQuery.source as HogQLQuery
+                    const response = await api.query(source)
+                    const columns = (response.columns ?? []) as string[]
+                    const at = (name: string): number => columns.indexOf(name)
+                    const rows = (response.results ?? []) as unknown[][]
+                    return rows.map((row) => ({
+                        sessionId: String(row[at('session_id')] ?? ''),
+                        distinctId: String(row[at('distinct_id')] ?? ''),
+                        traces: Number(row[at('traces')] ?? 0),
+                        totalCost: Number(row[at('total_cost')] ?? 0),
+                        totalLatency: Number(row[at('total_latency')] ?? 0),
+                        errors: Number(row[at('errors')] ?? 0),
+                        lastSeen: String(row[at('last_seen')] ?? ''),
+                    }))
+                },
+            },
+        ],
+    })),
+
     listeners(({ actions, values }) => ({
+        applyUrlState: () => actions.loadSessions(),
+        setSessionsSort: () => actions.loadSessions(),
         toggleSessionExpanded: async ({ sessionId }) => {
             if (
                 values.expandedSessionIds.has(sessionId) &&
@@ -353,4 +399,26 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
             },
         ],
     }),
+
+    urlToAction(({ actions, values }) => ({
+        '/ai-observability/sessions/:id': ({ id }) => {
+            if (id && id !== values.selectedSessionId) {
+                actions.selectSession(id)
+            }
+        },
+        '/ai-observability/sessions': () => {
+            if (values.selectedSessionId) {
+                actions.selectSession(null)
+            }
+        },
+    })),
+
+    actionToUrl(() => ({
+        selectSession: ({ sessionId }) => {
+            const search = router.values.searchParams
+            return sessionId
+                ? combineUrl(urls.aiObservabilitySession(sessionId), search).url
+                : combineUrl(urls.aiObservabilitySessions(), search).url
+        },
+    })),
 ])

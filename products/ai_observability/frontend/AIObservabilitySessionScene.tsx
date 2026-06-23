@@ -25,13 +25,17 @@ import { AccessControlLevel, AccessControlResourceType } from '~/types'
 
 import { TraceSummary, aiObservabilitySessionDataLogic } from './aiObservabilitySessionDataLogic'
 import { aiObservabilitySessionLogic } from './aiObservabilitySessionLogic'
+import { buildSessionTimeline } from './buildSessionTimeline'
 import { AIObservabilityTraceEvents } from './components/AIObservabilityTraceEvents'
 import { SentimentBar } from './components/SentimentTag'
+import { SessionPlayerControls } from './components/SessionPlayer/SessionPlayerControls'
+import { SessionSeekbar } from './components/SessionPlayer/SessionSeekbar'
 import { TranscriptBubbleStream } from './ConversationDisplay/TranscriptBubbleStream'
 import { SessionTurn } from './extractSessionTurns'
 import { llmSentimentLazyLoaderLogic } from './llmSentimentLazyLoaderLogic'
 import { llmSessionTitleLazyLoaderLogic } from './llmSessionTitleLazyLoaderLogic'
 import { SENTIMENT_DATE_WINDOW_DAYS } from './sentimentUtils'
+import { sessionPlaybackLogic } from './sessionPlaybackLogic'
 import { formatLLMCost, getTraceTimestamp, sanitizeTraceUrlSearchParams } from './utils'
 
 const LLMASessionFeedbackDisplay = lazy(() =>
@@ -44,6 +48,10 @@ export const scene: SceneExport = {
 }
 
 export function AIObservabilitySessionScene(): JSX.Element {
+    return <SessionDetailPanel showBreadcrumb />
+}
+
+export function SessionDetailPanel({ showBreadcrumb = false }: { showBreadcrumb?: boolean }): JSX.Element {
     const sessionLogic = aiObservabilitySessionLogic()
     const { sessionId, query } = useValues(sessionLogic)
     const sessionDataLogic = aiObservabilitySessionDataLogic({ sessionId, query })
@@ -53,7 +61,7 @@ export function AIObservabilitySessionScene(): JSX.Element {
     return (
         <BindLogic logic={aiObservabilitySessionLogic} props={{}}>
             <BindLogic logic={aiObservabilitySessionDataLogic} props={{ sessionId, query }}>
-                <SessionSceneWrapper />
+                <SessionSceneWrapper showBreadcrumb={showBreadcrumb} />
             </BindLogic>
         </BindLogic>
     )
@@ -89,7 +97,7 @@ function SessionTraceSentimentBar({ traceId, createdAt }: { traceId: string; cre
     )
 }
 
-function SessionSceneWrapper(): JSX.Element {
+function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: boolean }): JSX.Element {
     const { featureFlags } = useValues(featureFlagLogic)
     const showFeedback = !!featureFlags[FEATURE_FLAGS.POSTHOG_AI_CONVERSATION_FEEDBACK_LLMA_SESSIONS]
     const showSentiment = !!featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_SENTIMENT]
@@ -105,6 +113,15 @@ function SessionSceneWrapper(): JSX.Element {
     // every `SessionTurnView` consumes the same `traceSearchParams`.
     const { searchParams } = useValues(router)
     const traceSearchParams = sanitizeTraceUrlSearchParams(searchParams, { removeSearch: true })
+
+    const playback = sessionPlaybackLogic({ sessionId })
+    const { playing, speed, currentMs, durationMs, turnStartsMs, visibleTurnIndex } = useValues(playback)
+    const { togglePlay, setSpeed, seek, setTimeline } = useActions(playback)
+    const built = buildSessionTimeline(sessionTurns)
+    useEffect(() => {
+        setTimeline(built.turnStartsMs, built.durationMs)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionId, sessionTurns.length])
 
     const showSessionSummarization =
         featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_SESSION_SUMMARIZATION] ||
@@ -139,7 +156,7 @@ function SessionSceneWrapper(): JSX.Element {
 
     return (
         <div className="relative flex flex-col gap-4 max-w-[75rem]">
-            <SceneBreadcrumbBackButton />
+            {showBreadcrumb && <SceneBreadcrumbBackButton />}
             {titleLoading ? (
                 <LemonSkeleton className="h-8 w-96 max-w-full" />
             ) : (
@@ -179,8 +196,26 @@ function SessionSceneWrapper(): JSX.Element {
                 )}
             </header>
 
+            {durationMs > 0 && (
+                <div className="flex flex-col gap-2 border rounded p-3 bg-surface-primary">
+                    <SessionSeekbar
+                        durationMs={durationMs}
+                        currentMs={currentMs}
+                        turnStartsMs={turnStartsMs}
+                        onSeek={seek}
+                    />
+                    <SessionPlayerControls
+                        playing={playing}
+                        speed={speed}
+                        currentMs={currentMs}
+                        durationMs={durationMs}
+                        onTogglePlay={togglePlay}
+                        onSetSpeed={setSpeed}
+                    />
+                </div>
+            )}
             <div className="flex flex-col">
-                {sessionTurns.map((turn) => (
+                {(playing || currentMs > 0 ? sessionTurns.slice(0, visibleTurnIndex + 1) : sessionTurns).map((turn) => (
                     <SessionTurnView
                         key={turn.trace.id}
                         turn={turn}
