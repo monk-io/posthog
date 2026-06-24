@@ -144,7 +144,7 @@ function SessionPreview({
             aria-pressed={isActive}
             onClick={onClick}
             className={cn(
-                'w-full text-left cursor-pointer border-l-2 px-2 py-1.5 text-xs flex flex-col gap-1',
+                'ph-no-capture w-full text-left cursor-pointer border-l-2 px-2 py-1.5 text-xs flex flex-col gap-1',
                 isActive
                     ? 'border-l-accent bg-accent-highlight-secondary'
                     : 'border-l-transparent hover:bg-accent-highlight-secondary'
