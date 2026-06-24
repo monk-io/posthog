@@ -24,6 +24,7 @@ export const CAPABILITIES_CDP: PluginServerCapabilities = {
 export const CAPABILITIES_CDP_WORKFLOWS: PluginServerCapabilities = {
     ...CAPABILITIES_CDP,
     cdpBatchHogFlow: true,
+    cdpCyclotronWorkerBatchResolve: true,
     cdpCyclotronWorkerHogFlow: true,
     cdpCyclotronWorkerEmail: true,
     cdpCyclotronV2Janitor: isDevEnv(),
@@ -172,6 +173,10 @@ export function getPluginServerCapabilities(
         case PluginServerMode.cdp_batch_hogflow_requests:
             return {
                 cdpBatchHogFlow: true,
+            }
+        case PluginServerMode.cdp_cyclotron_worker_batch_resolve:
+            return {
+                cdpCyclotronWorkerBatchResolve: true,
             }
         case PluginServerMode.cdp_data_warehouse_events:
             return {
