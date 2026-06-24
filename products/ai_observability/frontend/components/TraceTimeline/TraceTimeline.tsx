@@ -11,15 +11,15 @@ import { LLMTraceEvent } from '~/queries/schema/schema-general'
 import { TraceBarKind, buildTraceTimeline } from './buildTraceTimeline'
 
 // Mirror the trace tree's EventTypeTag colors: generation green, embedding amber,
-// span neutral (transparent + light border, like the tree's default tag).
+// span neutral. The span bar is opaque so a nested bar doesn't bleed the bar
+// behind it through on a single row.
 const KIND_CLASS: Record<TraceBarKind, string> = {
     generation: 'bg-success',
-    span: 'border border-primary',
+    span: 'bg-surface-primary border border-primary',
     embedding: 'bg-warning',
     other: 'bg-muted',
 }
 
-// Per-lane row height (px): overlapping bars stack into lanes instead of colliding.
 const ROW_H = 24
 
 export function TraceTimeline({
@@ -32,7 +32,7 @@ export function TraceTimeline({
     onSelectEvent: (id: string) => void
 }): JSX.Element | null {
     const [collapsed, setCollapsed] = useState(false)
-    const { bars, totalMs, laneCount } = buildTraceTimeline(events)
+    const { bars, totalMs } = buildTraceTimeline(events)
 
     if (!bars.length || totalMs <= 0) {
         return null
@@ -40,6 +40,8 @@ export function TraceTimeline({
 
     const presentKinds = Array.from(new Set(bars.map((b) => b.kind)))
     const pct = (ms: number): number => (ms / totalMs) * 100
+    // Single row: paint longest bars first so shorter, nested bars land on top.
+    const renderBars = [...bars].sort((a, b) => b.durationMs - a.durationMs)
 
     return (
         <div className="border rounded bg-surface-primary">
@@ -59,9 +61,9 @@ export function TraceTimeline({
                     <div
                         className="relative mx-3"
                         // eslint-disable-next-line react/forbid-dom-props
-                        style={{ height: laneCount * ROW_H }}
+                        style={{ height: ROW_H }}
                     >
-                        {bars.map((bar) => {
+                        {renderBars.map((bar) => {
                             const widthPct = Math.max(pct(bar.durationMs), 0.5)
                             const selected = selectedEventId === bar.id
                             const dur = humanFriendlyMilliseconds(bar.durationMs)
@@ -82,7 +84,7 @@ export function TraceTimeline({
                                         style={{
                                             left: `${pct(bar.startMs)}%`,
                                             width: `${widthPct}%`,
-                                            top: bar.lane * ROW_H + 2,
+                                            top: 2,
                                         }}
                                         data-attr="trace-timeline-bar"
                                     >
