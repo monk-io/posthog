@@ -264,6 +264,12 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
     listeners(({ actions, values }) => ({
         applyUrlState: () => actions.loadSessions(),
         setSessionsSort: () => actions.loadSessions(),
+        // The date picker, property filters, and test-account toggle mutate shared
+        // state directly (no URL round-trip in this scene), so reload the list when
+        // they change too — otherwise it only refreshed on full page load.
+        setDates: () => actions.loadSessions(),
+        setPropertyFilters: () => actions.loadSessions(),
+        setShouldFilterTestAccounts: () => actions.loadSessions(),
         toggleSessionExpanded: async ({ sessionId }) => {
             if (
                 values.expandedSessionIds.has(sessionId) &&
