@@ -84,7 +84,9 @@ function DetailPane({ className }: { className?: string }): JSX.Element {
 }
 
 function ListPane({ className }: { className?: string }): JSX.Element {
-    const { sessions, sessionsLoading, selectedSessionId } = useValues(aiObservabilitySessionsViewLogic)
+    const { sessions, sessionsLoading, selectedSessionId, getSessionTitle } = useValues(
+        aiObservabilitySessionsViewLogic
+    )
     const { selectSession } = useActions(aiObservabilitySessionsViewLogic)
 
     return (
@@ -109,6 +111,7 @@ function ListPane({ className }: { className?: string }): JSX.Element {
                             <li key={session.sessionId}>
                                 <SessionPreview
                                     session={session}
+                                    title={getSessionTitle(session.sessionId)}
                                     isActive={session.sessionId === selectedSessionId}
                                     onClick={() => selectSession(session.sessionId)}
                                 />
@@ -123,13 +126,18 @@ function ListPane({ className }: { className?: string }): JSX.Element {
 
 function SessionPreview({
     session,
+    title,
     isActive,
     onClick,
 }: {
     session: SessionListRow
+    // `undefined` while the title loads, `null` when no usable title was found.
+    title: string | null | undefined
     isActive: boolean
     onClick: () => void
 }): JSX.Element {
+    const fallbackLabel = session.distinctId || 'unknown'
+
     return (
         <button
             type="button"
@@ -144,16 +152,23 @@ function SessionPreview({
             data-attr="llma-session-preview"
         >
             <div className="flex items-center justify-between gap-2">
-                <span className="font-mono truncate">{session.distinctId || 'unknown'}</span>
+                {title === undefined ? (
+                    <LemonSkeleton className="h-4 w-40" />
+                ) : (
+                    <span className={cn('truncate', title ? 'font-semibold' : 'font-mono')} title={title || undefined}>
+                        {title || fallbackLabel}
+                    </span>
+                )}
                 <span className="shrink-0 text-secondary">
                     <TZLabel time={session.lastSeen} />
                 </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-secondary">
-                <span>
-                    {session.traces} {session.traces === 1 ? 'turn' : 'turns'}
-                </span>
-                <span className="flex items-center gap-2">
+                <span className="font-mono truncate">{fallbackLabel}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                    <span>
+                        {session.traces} {session.traces === 1 ? 'turn' : 'turns'}
+                    </span>
                     {session.errors > 0 && <span className="text-danger">{session.errors} err</span>}
                     {session.totalCost > 0 && <span>{formatLLMCost(session.totalCost)}</span>}
                     <span>{session.totalLatency.toFixed(2)}s</span>

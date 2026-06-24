@@ -20,6 +20,7 @@ import { PropertyFilterType, PropertyOperator } from '~/types'
 
 import sessionsQueryTemplate from '../../backend/queries/sessions.sql?raw'
 import { SortDirection, SortState, aiObservabilitySharedLogic } from '../aiObservabilitySharedLogic'
+import { llmSessionTitleLazyLoaderLogic } from '../llmSessionTitleLazyLoaderLogic'
 import type { aiObservabilitySessionsViewLogicType } from './aiObservabilitySessionsViewLogicType'
 
 export type AIObservabilitySessionsViewLogicProps = Record<string, never>
@@ -43,10 +44,14 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
             ['dateFilter', 'shouldFilterTestAccounts', 'propertyFilters'],
             groupsModel,
             ['groupsTaxonomicTypes'],
+            llmSessionTitleLazyLoaderLogic,
+            ['getSessionTitle'],
         ],
         actions: [
             aiObservabilitySharedLogic,
             ['setDates', 'setPropertyFilters', 'setShouldFilterTestAccounts', 'applyUrlState'],
+            llmSessionTitleLazyLoaderLogic,
+            ['ensureSessionTitleLoaded'],
         ],
     })),
 
@@ -262,6 +267,14 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
     })),
 
     listeners(({ actions, values }) => ({
+        // Pre-load conversation titles for the whole list so each row can show its
+        // human title. The loader batches these (and dedupes against its cache), so
+        // re-selecting an already-listed session never re-queries its title.
+        loadSessionsSuccess: ({ sessions }) => {
+            for (const session of sessions) {
+                actions.ensureSessionTitleLoaded(session.sessionId, values.dateFilter)
+            }
+        },
         applyUrlState: () => actions.loadSessions(),
         setSessionsSort: () => actions.loadSessions(),
         // The date picker, property filters, and test-account toggle mutate shared
