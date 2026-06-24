@@ -1,9 +1,9 @@
 import { BindLogic, useActions, useValues } from 'kea'
 import { combineUrl, router } from 'kea-router'
-import { type ReactNode, type Ref, Suspense, lazy, useEffect, useRef } from 'react'
+import { type Ref, Suspense, lazy, useEffect, useRef } from 'react'
 
-import { IconChevronRight, IconExternal, IconWrench } from '@posthog/icons'
-import { LemonButton, LemonTag, Spinner, SpinnerOverlay, Tooltip } from '@posthog/lemon-ui'
+import { IconExternal, IconWrench } from '@posthog/icons'
+import { LemonButton, LemonDrawer, LemonTag, Spinner, SpinnerOverlay, Tooltip } from '@posthog/lemon-ui'
 
 import { AccessControlAction } from 'lib/components/AccessControlAction'
 import { TZLabel } from 'lib/components/TZLabel'
@@ -13,7 +13,6 @@ import { LemonSkeleton } from 'lib/lemon-ui/LemonSkeleton'
 import { Link } from 'lib/lemon-ui/Link'
 import { featureFlagLogic } from 'lib/logic/featureFlagLogic'
 import { useAttachedLogic } from 'lib/logic/scenes/useAttachedLogic'
-import { cn } from 'lib/utils/css-classes'
 import { InsightEmptyState, InsightErrorState } from 'scenes/insights/EmptyStates'
 import { maxGlobalLogic } from 'scenes/max/maxGlobalLogic'
 import { SceneExport } from 'scenes/sceneTypes'
@@ -106,16 +105,37 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
     const showFeedback = !!featureFlags[FEATURE_FLAGS.POSTHOG_AI_CONVERSATION_FEEDBACK_LLMA_SESSIONS]
     const showSentiment = !!featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_SENTIMENT]
 
-    const { traces, responseLoading, responseError, sessionTurns, hasMoreData, nextDataLoading, summariesLoading } =
-        useValues(aiObservabilitySessionDataLogic)
+    const {
+        traces,
+        responseLoading,
+        responseError,
+        sessionTurns,
+        hasMoreData,
+        nextDataLoading,
+        summariesLoading,
+        drawerTraceId,
+        fullTraces,
+        loadingFullTraces,
+        expandedGenerationIds,
+    } = useValues(aiObservabilitySessionDataLogic)
     const { sessionId, dateRange } = useValues(aiObservabilitySessionLogic)
-    const { summarizeAllTraces, loadNextData } = useActions(aiObservabilitySessionDataLogic)
+    const { summarizeAllTraces, loadNextData, closeStepsDrawer, toggleGenerationExpanded } = useActions(
+        aiObservabilitySessionDataLogic
+    )
     const { dataProcessingAccepted } = useValues(maxGlobalLogic)
     const { getSessionTitle } = useValues(llmSessionTitleLazyLoaderLogic)
     const { ensureSessionTitleLoaded } = useActions(llmSessionTitleLazyLoaderLogic)
     // Computed once for the page, not per turn.
     const { searchParams } = useValues(router)
     const traceSearchParams = sanitizeTraceUrlSearchParams(searchParams, { removeSearch: true })
+
+    const drawerTurn = drawerTraceId ? sessionTurns.find((t) => t.trace.id === drawerTraceId) : undefined
+    const drawerTraceUrl = drawerTurn
+        ? combineUrl(urls.aiObservabilityTrace(drawerTurn.trace.id), {
+              ...traceSearchParams,
+              timestamp: getTraceTimestamp(drawerTurn.trace.createdAt),
+          }).url
+        : ''
 
     const playback = sessionPlaybackLogic({ sessionId })
     const { playing, speed, currentMs, durationMs } = useValues(playback)
@@ -283,6 +303,31 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                     />
                 </div>
             )}
+
+            <LemonDrawer
+                isOpen={!!drawerTraceId}
+                onClose={closeStepsDrawer}
+                title={drawerTurn?.trace.traceName || 'Trace steps'}
+                width={680}
+                data-attr="llm-session-steps-drawer"
+                description={
+                    drawerTraceUrl ? (
+                        <Link to={drawerTraceUrl} target="_blank" className="text-xs">
+                            Open full trace ↗
+                        </Link>
+                    ) : undefined
+                }
+            >
+                {drawerTraceId ? (
+                    <AIObservabilityTraceEvents
+                        trace={fullTraces[drawerTraceId]}
+                        isLoading={loadingFullTraces.has(drawerTraceId)}
+                        expandedEventIds={expandedGenerationIds}
+                        onToggleEventExpand={toggleGenerationExpanded}
+                        traceId={drawerTraceId}
+                    />
+                ) : null}
+            </LemonDrawer>
         </div>
     )
 }
@@ -349,15 +394,14 @@ function SessionTurnView({
     traceSearchParams: Record<string, unknown>
     rootRef?: Ref<HTMLDivElement>
 }): JSX.Element {
-    const { traceSummaries, loadingFullTraces, fullTraces, stepsExpandedTraceIds, expandedGenerationIds } = useValues(
+    const { traceSummaries, loadingFullTraces, fullTraces, expandedGenerationIds } = useValues(
         aiObservabilitySessionDataLogic
     )
-    const { toggleSteps, toggleGenerationExpanded, loadFullTrace } = useActions(aiObservabilitySessionDataLogic)
+    const { openStepsDrawer, toggleGenerationExpanded, loadFullTrace } = useActions(aiObservabilitySessionDataLogic)
 
     const trace = turn.trace
     const summary: TraceSummary | undefined = traceSummaries[trace.id]
     const isLoading = loadingFullTraces.has(trace.id)
-    const stepsShown = stepsExpandedTraceIds.has(trace.id)
     const fullTrace = fullTraces[trace.id]
     const baseTraceParams = {
         ...traceSearchParams,
@@ -371,16 +415,6 @@ function SessionTurnView({
     const isSpanOnly = turn.isLoaded && !turn.userVisibleTurn
     // Only a settled turn shows its summary, tools, errors, steps, and sidebar.
     const isComplete = phase === 'complete'
-
-    // Shared by the "Show steps" toggle and the clickable tool pills.
-    const openSteps = (): void => {
-        if (!fullTrace && !isLoading) {
-            loadFullTrace(trace.id)
-        }
-        if (!stepsShown) {
-            toggleSteps(trace.id)
-        }
-    }
 
     return (
         <div className="flex flex-col" ref={rootRef}>
@@ -404,7 +438,7 @@ function SessionTurnView({
                                     key={name}
                                     size="small"
                                     className="font-mono cursor-pointer hover:bg-fill-button-tertiary-hover"
-                                    onClick={openSteps}
+                                    onClick={() => openStepsDrawer(trace.id)}
                                     icon={<IconWrench />}
                                 >
                                     {name}
@@ -440,34 +474,23 @@ function SessionTurnView({
                     )}
 
                     {isComplete && hasTranscript && (
-                        <div className="flex flex-col gap-1.5">
-                            <TurnDisclosure
-                                label={stepsShown ? 'Hide steps' : 'Show steps'}
-                                expanded={stepsShown}
-                                onToggle={() => {
-                                    if (!stepsShown && !fullTrace && !isLoading) {
-                                        loadFullTrace(trace.id)
-                                    }
-                                    toggleSteps(trace.id)
-                                }}
-                                action={
-                                    <LemonButton
-                                        size="xsmall"
-                                        icon={<IconExternal />}
-                                        to={traceUrl}
-                                        targetBlank
-                                        tooltip="Open trace in new tab"
-                                        data-attr="llm-session-open-trace"
-                                    />
-                                }
+                        <div className="flex items-center gap-1.5">
+                            <LemonButton
+                                size="xsmall"
+                                type="tertiary"
+                                onClick={() => openStepsDrawer(trace.id)}
+                                data-attr="llm-session-view-steps"
                             >
-                                <StepsPanel
-                                    traceId={trace.id}
-                                    fullTrace={fullTrace}
-                                    expandedEventIds={expandedGenerationIds}
-                                    onToggleEventExpand={toggleGenerationExpanded}
-                                />
-                            </TurnDisclosure>
+                                View steps
+                            </LemonButton>
+                            <LemonButton
+                                size="xsmall"
+                                icon={<IconExternal />}
+                                to={traceUrl}
+                                targetBlank
+                                tooltip="Open trace in new tab"
+                                data-attr="llm-session-open-trace"
+                            />
                         </div>
                     )}
 
@@ -487,39 +510,6 @@ function SessionTurnView({
                     </div>
                 )}
             </div>
-        </div>
-    )
-}
-
-// A muted chevron disclosure; an optional `action` renders beside the label,
-// outside its toggle button.
-function TurnDisclosure({
-    label,
-    expanded,
-    onToggle,
-    children,
-    action,
-}: {
-    label: string
-    expanded: boolean
-    onToggle: () => void
-    children: ReactNode
-    action?: ReactNode
-}): JSX.Element {
-    return (
-        <div className="flex flex-col gap-1.5 text-xs text-muted">
-            <div className="flex items-center gap-1 self-start">
-                <button
-                    type="button"
-                    className="flex items-center gap-1 hover:text-default cursor-pointer"
-                    onClick={onToggle}
-                >
-                    <IconChevronRight className={cn('transition-transform', expanded && 'rotate-90')} />
-                    <span>{label}</span>
-                </button>
-                {action}
-            </div>
-            {expanded && children}
         </div>
     )
 }

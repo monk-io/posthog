@@ -77,10 +77,9 @@ export const aiObservabilitySessionDataLogic = kea<aiObservabilitySessionDataLog
     })),
 
     actions({
-        // Steps panel = the per-turn `AIObservabilityTraceEvents` tree shown via the
-        // "Show steps" link. Distinct from "trace loaded" because the conversation
-        // bubbles render as soon as the full trace is fetched, regardless of steps state.
-        toggleSteps: (traceId: string) => ({ traceId }),
+        // Which trace's steps are open in the side drawer (one at a time, or null).
+        openStepsDrawer: (traceId: string) => ({ traceId }),
+        closeStepsDrawer: true,
         toggleGenerationExpanded: (generationId: string) => ({ generationId }),
         loadFullTrace: (traceId: string) => ({ traceId }),
         loadFullTraceSuccess: (traceId: string, trace: LLMTrace) => ({ traceId, trace }),
@@ -95,18 +94,11 @@ export const aiObservabilitySessionDataLogic = kea<aiObservabilitySessionDataLog
     }),
 
     reducers({
-        stepsExpandedTraceIds: [
-            new Set<string>() as Set<string>,
+        drawerTraceId: [
+            null as string | null,
             {
-                toggleSteps: (state, { traceId }) => {
-                    const newSet = new Set(state)
-                    if (newSet.has(traceId)) {
-                        newSet.delete(traceId)
-                    } else {
-                        newSet.add(traceId)
-                    }
-                    return newSet
-                },
+                openStepsDrawer: (_, { traceId }) => traceId,
+                closeStepsDrawer: () => null,
             },
         ],
         expandedGenerationIds: [
@@ -261,6 +253,11 @@ export const aiObservabilitySessionDataLogic = kea<aiObservabilitySessionDataLog
                     actions.loadFullTraceFailure(traceId)
                 } finally {
                     inFlightTraceFetches.delete(traceId)
+                }
+            },
+            openStepsDrawer: ({ traceId }) => {
+                if (!values.fullTraces[traceId] && !values.loadingFullTraces.has(traceId)) {
+                    actions.loadFullTrace(traceId)
                 }
             },
             summarizeAllTraces: async () => {
