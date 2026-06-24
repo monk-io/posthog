@@ -2,7 +2,7 @@ import { BindLogic, useActions, useValues } from 'kea'
 import { combineUrl, router } from 'kea-router'
 import { type Ref, Suspense, lazy, useEffect, useRef } from 'react'
 
-import { IconExternal, IconWrench } from '@posthog/icons'
+import { IconWarning, IconWrench } from '@posthog/icons'
 import { LemonButton, LemonDrawer, LemonTag, Spinner, SpinnerOverlay, Tooltip } from '@posthog/lemon-ui'
 
 import { AccessControlAction } from 'lib/components/AccessControlAction'
@@ -315,7 +315,7 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                 description={
                     drawerTraceUrl ? (
                         <Link to={drawerTraceUrl} target="_blank" className="text-xs">
-                            Open full trace ↗
+                            Open full trace
                         </Link>
                     ) : undefined
                 }
@@ -418,8 +418,10 @@ function SessionTurnView({
         ...traceSearchParams,
         timestamp: getTraceTimestamp(trace.createdAt),
     }
-    const traceUrl = combineUrl(urls.aiObservabilityTrace(trace.id), baseTraceParams).url
     const summaryUrl = combineUrl(urls.aiObservabilityTrace(trace.id), { ...baseTraceParams, tab: 'summary' }).url
+    const stepCount = (fullTrace?.events ?? []).filter(
+        (e) => e.event === '$ai_generation' || e.event === '$ai_span' || e.event === '$ai_embedding'
+    ).length
 
     const hasTranscript = turn.isLoaded && !!turn.userVisibleTurn
     // Span-only turns have no transcript, so the span tree IS the conversation.
@@ -444,17 +446,30 @@ function SessionTurnView({
 
                     {isComplete && turn.tools.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted">
-                            {turn.tools.map((name) => (
-                                <LemonTag
-                                    key={name}
-                                    size="small"
-                                    className="font-mono cursor-pointer hover:bg-fill-button-tertiary-hover"
-                                    onClick={() => openStepsDrawer(trace.id)}
-                                    icon={<IconWrench />}
-                                >
-                                    {name}
-                                </LemonTag>
-                            ))}
+                            {turn.tools.map((name) => {
+                                // Tool spans and error labels both come from `$ai_span_name`,
+                                // so an exact match flags the tool call that failed.
+                                const toolError = turn.errors.find((e) => e.label === name)
+                                const pill = (
+                                    <LemonTag
+                                        key={name}
+                                        size="small"
+                                        type={toolError ? 'danger' : undefined}
+                                        className="font-mono cursor-pointer hover:bg-fill-button-tertiary-hover"
+                                        onClick={() => openStepsDrawer(trace.id)}
+                                        icon={toolError ? <IconWarning /> : <IconWrench />}
+                                    >
+                                        {name}
+                                    </LemonTag>
+                                )
+                                return toolError ? (
+                                    <Tooltip key={name} title={toolError.message}>
+                                        {pill}
+                                    </Tooltip>
+                                ) : (
+                                    pill
+                                )
+                            })}
                         </div>
                     )}
 
@@ -485,23 +500,15 @@ function SessionTurnView({
                     )}
 
                     {isComplete && hasTranscript && (
-                        <div className="flex items-center gap-1.5">
+                        <div>
                             <LemonButton
                                 size="xsmall"
                                 type="tertiary"
                                 onClick={() => openStepsDrawer(trace.id)}
                                 data-attr="llm-session-view-steps"
                             >
-                                View steps
+                                View steps{stepCount > 0 ? ` (${stepCount})` : ''}
                             </LemonButton>
-                            <LemonButton
-                                size="xsmall"
-                                icon={<IconExternal />}
-                                to={traceUrl}
-                                targetBlank
-                                tooltip="Open trace in new tab"
-                                data-attr="llm-session-open-trace"
-                            />
                         </div>
                     )}
 
