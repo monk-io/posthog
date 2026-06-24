@@ -5617,7 +5617,6 @@ export type APIScopeObject =
     | 'organization_integration'
     | 'organization_member'
     | 'person'
-    | 'persisted_folder'
     | 'plugin'
     | 'product_tour'
     | 'project'
