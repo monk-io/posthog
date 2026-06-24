@@ -36,8 +36,10 @@ export interface TraceSummary {
 // button. Picking first N and not first and last N, because cross-trace dedup walks
 // chronologically and accumulates `seenSignatures`; any gap in loaded turns would
 // let the later turns' running history show as "new" content.
-// Most sessions have less than 10 turns, a proper fix later is a bulk query.
-const AUTO_LOAD_LIMIT = 10
+// Kept small because each trace is a separate query fired in parallel — a single
+// session open must stay well under the per-org concurrent-query budget. The proper
+// fix is one bulk query for the first N traces' events.
+const AUTO_LOAD_LIMIT = 5
 
 export interface SessionDataLogicProps {
     sessionId: string
