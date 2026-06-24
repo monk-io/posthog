@@ -37,6 +37,7 @@ from posthog.temporal.data_imports.pipelines.pipeline.batcher import Batcher
 from posthog.temporal.data_imports.pipelines.pipeline.cdp_producer import CDPProducer
 from posthog.temporal.data_imports.pipelines.pipeline.delta_table_helper import DeltaTableHelper
 from posthog.temporal.data_imports.pipelines.pipeline.hogql_schema import HogQLSchema
+from posthog.temporal.data_imports.pipelines.pipeline.masking import mask_table_columns
 from posthog.temporal.data_imports.pipelines.pipeline.typings import PipelineResult, ResumableData, SourceResponse
 from posthog.temporal.data_imports.pipelines.pipeline.utils import (
     _append_debug_column_to_pyarrows_table,
@@ -282,6 +283,13 @@ class PipelineNonDLT(Generic[ResumableData]):
 
         pa_table = _append_debug_column_to_pyarrows_table(pa_table, self._load_id)
         pa_table = normalize_table_column_names(pa_table)
+        pa_table = mask_table_columns(
+            pa_table,
+            self._schema.masked_columns,
+            team_id=self._schema.team_id,
+            primary_keys=self._resource.primary_keys,
+            incremental_field=self._schema.incremental_field,
+        )
 
         pa_table = await setup_partitioning(pa_table, delta_table, self._schema, self._resource, self._logger)
 
