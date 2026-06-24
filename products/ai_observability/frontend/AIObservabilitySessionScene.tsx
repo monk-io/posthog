@@ -223,7 +223,7 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                     </LemonTag>
                     <LemonTag size="medium" className="bg-surface-primary">
                         {sessionStats.traceCount}
-                        {hasMoreData ? '+' : ''} {sessionStats.traceCount === 1 ? 'turn' : 'turns'}
+                        {hasMoreData ? '+' : ''} {sessionStats.traceCount === 1 ? 'trace' : 'traces'}
                     </LemonTag>
                     {sessionStats.totalCost > 0 && (
                         <LemonTag size="medium" className="bg-surface-primary">
@@ -271,7 +271,7 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                             onClick={loadNextData}
                             data-attr="llm-session-load-more-traces"
                         >
-                            Load more turns
+                            Load more traces
                         </LemonButton>
                     </div>
                 )}
@@ -366,7 +366,7 @@ function SummarizeAllButton({
                         disabledReason="AI data processing must be approved to summarize traces"
                         data-attr="llm-session-summarize-all"
                     >
-                        Summarize all turns
+                        Summarize all traces
                     </LemonButton>
                 </AccessControlAction>
             </AIConsentPopoverWrapper>
@@ -384,7 +384,7 @@ function SummarizeAllButton({
                 loading={loading}
                 data-attr="llm-session-summarize-all"
             >
-                Summarize all turns
+                Summarize all traces
             </LemonButton>
         </AccessControlAction>
     )
@@ -502,7 +502,7 @@ function SessionTurnView({
                                 onClick={() => openStepsDrawer(trace.id)}
                                 data-attr="llm-session-view-steps"
                             >
-                                View steps{stepCount > 0 ? ` (${stepCount})` : ''}
+                                View trace{stepCount > 0 ? ` (${stepCount} ${stepCount === 1 ? 'step' : 'steps'})` : ''}
                             </LemonButton>
                         </div>
                     )}

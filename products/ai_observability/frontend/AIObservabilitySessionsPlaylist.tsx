@@ -167,7 +167,7 @@ function SessionPreview({
                 <span className="font-mono truncate">{fallbackLabel}</span>
                 <span className="flex shrink-0 items-center gap-2">
                     <span>
-                        {session.traces} {session.traces === 1 ? 'turn' : 'turns'}
+                        {session.traces} {session.traces === 1 ? 'trace' : 'traces'}
                     </span>
                     {session.errors > 0 && <span className="text-danger">{session.errors} err</span>}
                     {session.totalCost > 0 && <span>{formatLLMCost(session.totalCost)}</span>}
