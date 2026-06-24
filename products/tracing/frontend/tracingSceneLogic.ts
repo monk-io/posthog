@@ -90,6 +90,7 @@ export const tracingSceneLogic = kea<tracingSceneLogicType>([
         closeCompareFlame: true,
         syncUrlAndRunQuery: true,
         handleFilterChange: (filterType: string, extraProps?: Record<string, unknown>) => ({ filterType, extraProps }),
+        setActiveTracingTab: (tab: 'traces' | 'operations') => ({ tab }),
     }),
 
     reducers({
@@ -145,6 +146,12 @@ export const tracingSceneLogic = kea<tracingSceneLogicType>([
             {
                 openCompareFlame: (_, { serviceName }) => serviceName,
                 closeCompareFlame: () => null,
+            },
+        ],
+        activeTracingTab: [
+            'traces' as 'traces' | 'operations',
+            {
+                setActiveTracingTab: (_, { tab }) => tab,
             },
         ],
     }),
@@ -211,6 +218,10 @@ export const tracingSceneLogic = kea<tracingSceneLogicType>([
         handleFilterChange: ({ filterType, extraProps }) => {
             posthog.capture('tracing filter changed', { filter_type: filterType, ...extraProps })
             actions.syncUrlAndRunQuery()
+            // Keep the Operations aggregate in sync with filters/date while that tab is active.
+            if (values.activeTracingTab === 'operations') {
+                actions.fetchAggregation()
+            }
         },
         setDateRange: () => actions.handleFilterChange('date_range'),
         setServiceNames: () => actions.handleFilterChange('service_names'),
@@ -232,6 +243,11 @@ export const tracingSceneLogic = kea<tracingSceneLogicType>([
         },
         setFilters: () => {
             actions.syncUrlAndRunQuery()
+        },
+        setActiveTracingTab: ({ tab }) => {
+            if (tab === 'operations') {
+                actions.fetchAggregation()
+            }
         },
     })),
 
