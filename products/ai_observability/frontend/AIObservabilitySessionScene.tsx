@@ -142,10 +142,16 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
     const { playing, speed, currentMs, durationMs } = useValues(playback)
     const { togglePlay, setSpeed, seek, setTimeline } = useActions(playback)
     const built = buildSessionTimeline(sessionTurns)
+    // Keep the player's duration in sync with the computed timeline. A late full-trace
+    // load can change a turn's latency (and the total duration) without changing the turn
+    // count, so depend on the duration itself rather than the turn count — otherwise the
+    // seekbar thumb (currentMs / durationMs) and the tick positions (built.durationMs)
+    // drift apart. setTimeline clamps the position instead of rewinding, so re-syncing
+    // mid-playback doesn't jump back to the start.
     useEffect(() => {
         setTimeline(built.durationMs)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sessionId, sessionTurns.length])
+    }, [sessionId, built.durationMs])
 
     // Idle: show the whole conversation. Scrubbing: reveal turns phase by phase.
     const isScrubbing = playing || currentMs > 0

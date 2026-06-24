@@ -34,7 +34,9 @@ export const sessionPlaybackLogic = kea<sessionPlaybackLogicType>([
             {
                 seek: (_, { ms }) => Math.max(ms, 0),
                 setCurrentMs: (_, { ms }) => Math.max(ms, 0),
-                setTimeline: () => 0,
+                // A late trace load can change total duration without changing the turn
+                // count; keep the current position (clamped) instead of rewinding to 0.
+                setTimeline: (state, { durationMs }) => Math.min(state, durationMs),
             },
         ],
     }),

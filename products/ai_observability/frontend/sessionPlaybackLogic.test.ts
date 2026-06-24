@@ -32,4 +32,21 @@ describe('sessionPlaybackLogic', () => {
         logic.actions.tick(10_000) // clamps to duration, then pauses
         await expectLogic(logic).toMatchValues({ currentMs: 6000, playing: false })
     })
+
+    it('re-syncs a longer duration without rewinding the current position', async () => {
+        logic.actions.seek(2500)
+        // A late trace load extends the timeline; playback position is preserved.
+        await expectLogic(logic, () => logic.actions.setTimeline(8000)).toMatchValues({
+            currentMs: 2500,
+            durationMs: 8000,
+        })
+    })
+
+    it('clamps the current position when the duration shrinks', async () => {
+        logic.actions.seek(5000)
+        await expectLogic(logic, () => logic.actions.setTimeline(3000)).toMatchValues({
+            currentMs: 3000,
+            durationMs: 3000,
+        })
+    })
 })
