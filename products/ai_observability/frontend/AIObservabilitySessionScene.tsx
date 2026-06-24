@@ -1,16 +1,15 @@
 import { BindLogic, useActions, useValues } from 'kea'
 import { combineUrl, router } from 'kea-router'
-import { type ReactNode, type Ref, Suspense, lazy, useEffect, useMemo, useRef } from 'react'
+import { type ReactNode, type Ref, Suspense, lazy, useEffect, useRef } from 'react'
 
-import { IconChevronRight, IconEllipsis, IconExternal, IconWrench } from '@posthog/icons'
-import { LemonButton, LemonMenu, LemonTag, Spinner, SpinnerOverlay, Tooltip } from '@posthog/lemon-ui'
+import { IconChevronRight, IconExternal, IconWrench } from '@posthog/icons'
+import { LemonButton, LemonTag, Spinner, SpinnerOverlay, Tooltip } from '@posthog/lemon-ui'
 
 import { AccessControlAction } from 'lib/components/AccessControlAction'
 import { TZLabel } from 'lib/components/TZLabel'
 import { FEATURE_FLAGS } from 'lib/constants'
 import { dayjs } from 'lib/dayjs'
 import { LemonSkeleton } from 'lib/lemon-ui/LemonSkeleton'
-import { lemonToast } from 'lib/lemon-ui/LemonToast'
 import { Link } from 'lib/lemon-ui/Link'
 import { featureFlagLogic } from 'lib/logic/featureFlagLogic'
 import { useAttachedLogic } from 'lib/logic/scenes/useAttachedLogic'
@@ -149,8 +148,19 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
     // the user is paused/idle — only while the player is actively advancing.
     const latestTurnRef = useRef<HTMLDivElement>(null)
     useEffect(() => {
-        if (playing && latestTurnRef.current) {
-            latestTurnRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        if (!playing || !latestTurnRef.current) {
+            return
+        }
+        // Scroll the conversation fully to the bottom so the newest turn — and its
+        // typing/loading indicator — sits above the docked player, not behind it.
+        let scroller = latestTurnRef.current.parentElement
+        while (scroller && scroller.scrollHeight <= scroller.clientHeight) {
+            scroller = scroller.parentElement
+        }
+        if (scroller) {
+            scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' })
+        } else {
+            latestTurnRef.current.scrollIntoView({ block: 'end', behavior: 'smooth' })
         }
     }, [playing, revealedTurnCount, currentMs])
 
@@ -234,8 +244,6 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                         // Anchor for the player's auto-scroll: the last revealed turn.
                         rootRef={i === shown.length - 1 ? latestTurnRef : undefined}
                         turn={turn}
-                        turnIndex={i}
-                        allTurns={sessionTurns}
                         phase={isScrubbing ? phaseOf(i) : 'complete'}
                         showSentiment={showSentiment}
                         showSessionSummarization={!!showSessionSummarization}
@@ -338,8 +346,6 @@ function SummarizeAllButton({
 
 function SessionTurnView({
     turn,
-    turnIndex,
-    allTurns,
     phase = 'complete',
     showSentiment,
     showSessionSummarization,
@@ -347,8 +353,6 @@ function SessionTurnView({
     rootRef,
 }: {
     turn: SessionTurn
-    turnIndex: number
-    allTurns: SessionTurn[]
     phase?: TurnPhase
     showSentiment: boolean
     showSessionSummarization: boolean
@@ -399,13 +403,7 @@ function SessionTurnView({
                 <div className="flex-1 border-t" />
             </div>
             <div className="flex gap-10 pb-4">
-                <div className="relative flex-1 min-w-0 flex flex-col gap-2">
-                    {/* Overflow menu pinned to the top-right of the assistant turn. */}
-                    {isComplete && hasTranscript && turn.outputs.length > 0 && (
-                        <div className="absolute top-0 right-0 z-10">
-                            <TurnActionsMenu turn={turn} turnIndex={turnIndex} allTurns={allTurns} />
-                        </div>
-                    )}
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
                     {isComplete && showSessionSummarization && summary && (
                         <TurnSummaryLine summary={summary} summaryUrl={summaryUrl} />
                     )}
@@ -415,11 +413,11 @@ function SessionTurnView({
                     {isComplete && turn.tools.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted">
                             {turn.tools.map((name) => (
-                                // Clicking a tool opens this turn's Steps panel.
-                                // ponytail: scroll to / highlight the matching span event
-                                // (by `$ai_span_name`) inside StepsPanel — needs an anchor
-                                // (id/data-attr) on AIObservabilityEventCard, which is owned
-                                // by the traces tab and out of scope here.
+                                // Clicking a tool opens this turn's Steps panel. We deliberately
+                                // don't auto-expand the matching span: tool names come from either
+                                // $ai_span events or generation tool_calls, so the name→span mapping
+                                // is lossy, and focusing one needs async trace-load coordination —
+                                // not worth the complexity for a nice-to-have.
                                 <LemonTag
                                     key={name}
                                     size="small"
@@ -544,40 +542,6 @@ function TurnDisclosure({
             </div>
             {expanded && children}
         </div>
-    )
-}
-
-// Overflow menu at the top-right of an assistant turn. Single item for now:
-// "Turn into eval" — a mock that previews turning this response (plus everything
-// before it) into an evaluation case. The capture isn't wired up yet.
-function TurnActionsMenu({
-    turn,
-    turnIndex,
-    allTurns,
-}: {
-    turn: SessionTurn
-    turnIndex: number
-    allTurns: SessionTurn[]
-}): JSX.Element {
-    // Everything the eval would treat as input: every message before this turn's
-    // response — all prior turns plus this turn's own request.
-    const contextCount = useMemo(
-        () =>
-            allTurns.slice(0, turnIndex).reduce((n, t) => n + t.newInputs.length + t.outputs.length, 0) +
-            turn.newInputs.length,
-        [allTurns, turnIndex, turn.newInputs.length]
-    )
-    const createEval = (): void => {
-        const messages = contextCount === 1 ? 'message' : 'messages'
-        lemonToast.success(`Evaluation created from this response and ${contextCount} ${messages} of context (mock)`)
-    }
-    return (
-        <LemonMenu
-            items={[{ label: 'Turn into eval', onClick: createEval, 'data-attr': 'llm-session-turn-into-eval' }]}
-            placement="bottom-end"
-        >
-            <LemonButton size="small" noPadding icon={<IconEllipsis />} tooltip="Turn actions" />
-        </LemonMenu>
     )
 }
 
