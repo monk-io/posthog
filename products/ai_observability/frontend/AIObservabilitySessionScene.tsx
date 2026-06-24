@@ -121,9 +121,8 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
         expandedGenerationIds,
     } = useValues(aiObservabilitySessionDataLogic)
     const { sessionId, dateRange } = useValues(aiObservabilitySessionLogic)
-    const { summarizeAllTraces, loadNextData, closeStepsDrawer, toggleGenerationExpanded } = useActions(
-        aiObservabilitySessionDataLogic
-    )
+    const { summarizeAllTraces, loadNextData, closeStepsDrawer, toggleGenerationExpanded, focusGenerationExpanded } =
+        useActions(aiObservabilitySessionDataLogic)
     const { dataProcessingAccepted } = useValues(maxGlobalLogic)
     const { getSessionTitle } = useValues(llmSessionTitleLazyLoaderLogic)
     const { ensureSessionTitleLoaded } = useActions(llmSessionTitleLazyLoaderLogic)
@@ -325,8 +324,10 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                         {showTraceTimeline && (fullTraces[drawerTraceId]?.events?.length ?? 0) > 0 && (
                             <TraceTimeline
                                 events={fullTraces[drawerTraceId]?.events ?? []}
-                                selectedEventId={null}
-                                onSelectEvent={toggleGenerationExpanded}
+                                selectedEventId={
+                                    expandedGenerationIds.size === 1 ? Array.from(expandedGenerationIds)[0] : null
+                                }
+                                onSelectEvent={focusGenerationExpanded}
                             />
                         )}
                         <AIObservabilityTraceEvents
@@ -459,7 +460,7 @@ function SessionTurnView({
                                         size="small"
                                         type={toolError ? 'danger' : undefined}
                                         className="font-mono cursor-pointer hover:bg-fill-button-tertiary-hover"
-                                        onClick={() => openStepsDrawer(trace.id)}
+                                        onClick={() => openStepsDrawer(trace.id, name)}
                                         icon={toolError ? <IconWarning /> : <IconWrench />}
                                     >
                                         {name}
@@ -484,7 +485,7 @@ function SessionTurnView({
                                         type="danger"
                                         size="small"
                                         className="font-mono cursor-pointer hover:bg-fill-button-tertiary-hover"
-                                        onClick={() => openStepsDrawer(trace.id)}
+                                        onClick={() => openStepsDrawer(trace.id, e.label)}
                                         icon={<IconWarning />}
                                     >
                                         {e.label}

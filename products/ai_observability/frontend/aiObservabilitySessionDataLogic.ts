@@ -11,6 +11,7 @@ import {
     AnyResponseType,
     DataTableNode,
     LLMTrace,
+    LLMTraceEvent,
     NodeKind,
     TraceQuery,
     TracesQueryResponse,
@@ -22,6 +23,7 @@ import { aiObservabilitySessionLogic } from './aiObservabilitySessionLogic'
 import { restoreTree } from './aiObservabilityTraceDataLogic'
 import { SessionTurn, extractSessionTurns } from './extractSessionTurns'
 import { llmAnalyticsSummarizationBatchCheckCreate } from './generated/api'
+import { eventLabel } from './utils'
 
 export interface TraceSummary {
     title: string
@@ -58,6 +60,19 @@ function getDataNodeLogicProps({ sessionId, query, cachedResults }: SessionDataL
     return dataNodeLogicProps
 }
 
+// Maps a clicked tool/error pill to the trace event it represents so the drawer
+// can pre-expand that step. Tool spans and error labels both derive from the
+// event's `$ai_span_name`/`$ai_model` (via `eventLabel`), so an exact label match
+// finds the step; prefer the errored event when several share a label.
+function resolveFocusEventId(trace: LLMTrace, focusKey: string): string | null {
+    const events = trace.events ?? []
+    const isError = (e: LLMTraceEvent): boolean =>
+        e.properties?.$ai_is_error === true || e.properties?.$ai_is_error === 'true' || !!e.properties?.$ai_error
+    const match =
+        events.find((e) => eventLabel(e) === focusKey && isError(e)) ?? events.find((e) => eventLabel(e) === focusKey)
+    return match?.id ?? null
+}
+
 export const aiObservabilitySessionDataLogic = kea<aiObservabilitySessionDataLogicType>([
     path(['scenes', 'ai-observability', 'aiObservabilitySessionDataLogic']),
     props({} as SessionDataLogicProps),
@@ -78,9 +93,12 @@ export const aiObservabilitySessionDataLogic = kea<aiObservabilitySessionDataLog
 
     actions({
         // Which trace's steps are open in the side drawer (one at a time, or null).
-        openStepsDrawer: (traceId: string) => ({ traceId }),
+        // `focusEventKey` (a tool name / error label) pre-expands the matching step.
+        openStepsDrawer: (traceId: string, focusEventKey: string | null = null) => ({ traceId, focusEventKey }),
         closeStepsDrawer: true,
         toggleGenerationExpanded: (generationId: string) => ({ generationId }),
+        // Expand only this step, collapsing the rest (timeline / pill focus).
+        focusGenerationExpanded: (generationId: string) => ({ generationId }),
         loadFullTrace: (traceId: string) => ({ traceId }),
         loadFullTraceSuccess: (traceId: string, trace: LLMTrace) => ({ traceId, trace }),
         loadFullTraceFailure: (traceId: string) => ({ traceId }),
@@ -101,6 +119,15 @@ export const aiObservabilitySessionDataLogic = kea<aiObservabilitySessionDataLog
                 closeStepsDrawer: () => null,
             },
         ],
+        // A pending tool/error label to focus once the drawer's trace finishes loading.
+        drawerFocusKey: [
+            null as string | null,
+            {
+                openStepsDrawer: (_, { focusEventKey }) => focusEventKey,
+                closeStepsDrawer: () => null,
+                focusGenerationExpanded: () => null,
+            },
+        ],
         expandedGenerationIds: [
             new Set<string>() as Set<string>,
             {
@@ -113,6 +140,7 @@ export const aiObservabilitySessionDataLogic = kea<aiObservabilitySessionDataLog
                     }
                     return newSet
                 },
+                focusGenerationExpanded: (_, { generationId }) => new Set([generationId]),
             },
         ],
         fullTraces: [
@@ -262,9 +290,26 @@ export const aiObservabilitySessionDataLogic = kea<aiObservabilitySessionDataLog
                     inFlightTraceFetches.delete(traceId)
                 }
             },
-            openStepsDrawer: ({ traceId }) => {
-                if (!values.fullTraces[traceId] && !values.loadingFullTraces.has(traceId)) {
+            openStepsDrawer: ({ traceId, focusEventKey }) => {
+                const trace = values.fullTraces[traceId]
+                if (!trace && !values.loadingFullTraces.has(traceId)) {
                     actions.loadFullTrace(traceId)
+                }
+                // Already loaded: focus the clicked step now. Otherwise the
+                // loadFullTraceSuccess listener picks it up once events arrive.
+                if (trace && focusEventKey) {
+                    const id = resolveFocusEventId(trace, focusEventKey)
+                    if (id) {
+                        actions.focusGenerationExpanded(id)
+                    }
+                }
+            },
+            loadFullTraceSuccess: ({ traceId, trace }) => {
+                if (values.drawerFocusKey && traceId === values.drawerTraceId) {
+                    const id = resolveFocusEventId(trace, values.drawerFocusKey)
+                    if (id) {
+                        actions.focusGenerationExpanded(id)
+                    }
                 }
             },
             summarizeAllTraces: async () => {
