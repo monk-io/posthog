@@ -23,6 +23,7 @@ import { SceneBreadcrumbBackButton } from '~/layout/scenes/components/SceneBread
 import { LLMTrace } from '~/queries/schema/schema-general'
 import { AccessControlLevel, AccessControlResourceType } from '~/types'
 
+import { LazyPersonAvatar } from './aiObservabilityColumnRenderers'
 import { TraceSummary, aiObservabilitySessionDataLogic } from './aiObservabilitySessionDataLogic'
 import { aiObservabilitySessionLogic } from './aiObservabilitySessionLogic'
 import { buildSessionTimeline } from './buildSessionTimeline'
@@ -200,6 +201,8 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
     // Same loader as the sessions list, time-bounded to the page's date range.
     const heroTitle = getSessionTitle(sessionId)
     const titleLoading = heroTitle === undefined
+    // All traces in a session share the same user; show their avatar beside the title.
+    const sessionDistinctId = traces[0]?.distinctId
     useEffect(() => {
         ensureSessionTitleLoaded(sessionId, dateRange ?? undefined)
     }, [sessionId, dateRange, ensureSessionTitleLoaded])
@@ -217,11 +220,14 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
     return (
         <div className="relative flex flex-col gap-4 max-w-[75rem] min-h-full">
             {showBreadcrumb && <SceneBreadcrumbBackButton />}
-            {titleLoading ? (
-                <LemonSkeleton className="h-8 w-96 max-w-full" />
-            ) : (
-                heroTitle && <h1 className="text-2xl font-semibold leading-tight m-0 break-words">{heroTitle}</h1>
-            )}
+            <div className="flex items-center gap-2">
+                {sessionDistinctId && <LazyPersonAvatar distinctId={sessionDistinctId} />}
+                {titleLoading ? (
+                    <LemonSkeleton className="h-8 w-96 max-w-full" />
+                ) : (
+                    heroTitle && <h1 className="text-2xl font-semibold leading-tight m-0 break-words">{heroTitle}</h1>
+                )}
+            </div>
             <header className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex gap-1.5 flex-wrap">
                     <LemonTag size="medium" className="bg-surface-primary">
