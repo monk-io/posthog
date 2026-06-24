@@ -132,6 +132,7 @@ export const aiObservabilityTracesTabLogic = kea<aiObservabilityTracesTabLogicTy
                             : []),
                         ...(featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_TOOLS_TAB] ? ['__llm_tools'] : []),
                         'errorCount',
+                        'stepCount',
                         'totalLatency',
                         'usage',
                         'totalCost',
