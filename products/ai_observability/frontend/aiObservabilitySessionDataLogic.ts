@@ -191,6 +191,13 @@ export const aiObservabilitySessionDataLogic = kea<aiObservabilitySessionDataLog
             (traceSummaries: Record<string, TraceSummary>): boolean =>
                 Object.values(traceSummaries).some((s) => s.loading),
         ],
+        // Stay "loading" until the trace list AND the auto-loaded full traces settle,
+        // so the conversation appears at once instead of a second per-turn spinner.
+        initialLoading: [
+            (s) => [s.responseLoading, s.traces, s.loadingFullTraces],
+            (responseLoading: boolean, traces: LLMTrace[], loadingFullTraces: Set<string>): boolean =>
+                responseLoading || traces.slice(0, AUTO_LOAD_LIMIT).some((t) => loadingFullTraces.has(t.id)),
+        ],
     }),
 
     listeners(({ actions, values }) => {

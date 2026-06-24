@@ -31,6 +31,7 @@ import { SentimentBar } from './components/SentimentTag'
 import { SessionPlayerControls } from './components/SessionPlayer/SessionPlayerControls'
 import { SessionSeekbar } from './components/SessionPlayer/SessionSeekbar'
 import { TypingIndicator } from './components/SessionPlayer/TypingIndicator'
+import { TraceTimeline } from './components/TraceTimeline/TraceTimeline'
 import { TranscriptBubbleStream } from './ConversationDisplay/TranscriptBubbleStream'
 import { SessionTurn } from './extractSessionTurns'
 import { llmSentimentLazyLoaderLogic } from './llmSentimentLazyLoaderLogic'
@@ -104,10 +105,11 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
     const { featureFlags } = useValues(featureFlagLogic)
     const showFeedback = !!featureFlags[FEATURE_FLAGS.POSTHOG_AI_CONVERSATION_FEEDBACK_LLMA_SESSIONS]
     const showSentiment = !!featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_SENTIMENT]
+    const showTraceTimeline = !!featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_TRACE_TIMELINE]
 
     const {
         traces,
-        responseLoading,
+        initialLoading,
         responseError,
         sessionTurns,
         hasMoreData,
@@ -196,7 +198,7 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
         ensureSessionTitleLoaded(sessionId, dateRange ?? undefined)
     }, [sessionId, dateRange, ensureSessionTitleLoaded])
 
-    if (responseLoading) {
+    if (initialLoading) {
         return <SpinnerOverlay />
     }
     if (responseError) {
@@ -319,13 +321,22 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                 }
             >
                 {drawerTraceId ? (
-                    <AIObservabilityTraceEvents
-                        trace={fullTraces[drawerTraceId]}
-                        isLoading={loadingFullTraces.has(drawerTraceId)}
-                        expandedEventIds={expandedGenerationIds}
-                        onToggleEventExpand={toggleGenerationExpanded}
-                        traceId={drawerTraceId}
-                    />
+                    <div className="flex flex-col gap-3">
+                        {showTraceTimeline && (fullTraces[drawerTraceId]?.events?.length ?? 0) > 0 && (
+                            <TraceTimeline
+                                events={fullTraces[drawerTraceId]?.events ?? []}
+                                selectedEventId={null}
+                                onSelectEvent={toggleGenerationExpanded}
+                            />
+                        )}
+                        <AIObservabilityTraceEvents
+                            trace={fullTraces[drawerTraceId]}
+                            isLoading={loadingFullTraces.has(drawerTraceId)}
+                            expandedEventIds={expandedGenerationIds}
+                            onToggleEventExpand={toggleGenerationExpanded}
+                            traceId={drawerTraceId}
+                        />
+                    </div>
                 ) : null}
             </LemonDrawer>
         </div>
