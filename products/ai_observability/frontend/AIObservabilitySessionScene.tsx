@@ -422,6 +422,9 @@ function SessionTurnView({
     const stepCount = (fullTrace?.events ?? []).filter(
         (e) => e.event === '$ai_generation' || e.event === '$ai_span' || e.event === '$ai_embedding'
     ).length
+    // Errors already surfaced by a red tool pill are excluded; the rest (e.g.
+    // generation failures) render as their own pills in the same style.
+    const otherErrors = turn.errors.filter((e) => !turn.tools.includes(e.label))
 
     const hasTranscript = turn.isLoaded && !!turn.userVisibleTurn
     // Span-only turns have no transcript, so the span tree IS the conversation.
@@ -473,29 +476,21 @@ function SessionTurnView({
                         </div>
                     )}
 
-                    {isComplete && (trace.errorCount ?? 0) > 0 && (
-                        <div className="flex items-center gap-2 min-w-0">
-                            <LemonTag type="danger" size="small" className="shrink-0">
-                                {trace.errorCount === 1 ? '1 error' : `${trace.errorCount} errors`}
-                            </LemonTag>
-                            {turn.errors.length > 0 && (
-                                <Tooltip
-                                    title={
-                                        <div className="flex flex-col gap-1">
-                                            {turn.errors.map((e, i) => (
-                                                <div key={i}>
-                                                    <strong>{e.label}:</strong> {e.message}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    }
-                                >
-                                    <span className="text-xs text-muted truncate">
-                                        {turn.errors[0].label} · {turn.errors[0].message}
-                                        {turn.errors.length > 1 && ` · +${turn.errors.length - 1} more`}
-                                    </span>
+                    {isComplete && otherErrors.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted">
+                            {otherErrors.map((e, i) => (
+                                <Tooltip key={i} title={e.message}>
+                                    <LemonTag
+                                        type="danger"
+                                        size="small"
+                                        className="font-mono cursor-pointer hover:bg-fill-button-tertiary-hover"
+                                        onClick={() => openStepsDrawer(trace.id)}
+                                        icon={<IconWarning />}
+                                    >
+                                        {e.label}
+                                    </LemonTag>
                                 </Tooltip>
-                            )}
+                            ))}
                         </div>
                     )}
 
