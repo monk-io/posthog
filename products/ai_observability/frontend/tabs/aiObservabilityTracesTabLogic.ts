@@ -127,16 +127,14 @@ export const aiObservabilityTracesTabLogic = kea<aiObservabilityTracesTabLogicTy
                             ? ['inputState', 'outputState']
                             : []),
                         'person',
-                        ...(featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_SENTIMENT] && showSentimentColumn
-                            ? ['__llm_sentiment']
-                            : []),
-                        ...(featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_TOOLS_TAB] ? ['__llm_tools'] : []),
+                        ...(showSentimentColumn ? ['__llm_sentiment'] : []),
+                        '__llm_tools',
                         'errorCount',
                         'stepCount',
                         'totalLatency',
                         'usage',
                         'totalCost',
-                        ...(featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_TRACE_REVIEW] ? ['review'] : []),
+                        'review',
                         'createdAt',
                     ],
                     showDateRange: true,

@@ -181,6 +181,7 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
         featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_SESSION_SUMMARIZATION] ||
         featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_EARLY_ADOPTERS]
 
+    // Calculate session aggregates
     const sessionStats = traces.reduce(
         (acc, trace) => ({
             totalCost: acc.totalCost + (trace.totalCost || 0),
@@ -240,13 +241,11 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                         </Suspense>
                     )}
                 </div>
-                {showSessionSummarization && (
-                    <SummarizeAllButton
-                        loading={summariesLoading}
-                        dataProcessingAccepted={dataProcessingAccepted}
-                        onSummarize={summarizeAllTraces}
-                    />
-                )}
+                <SummarizeAllButton
+                    loading={summariesLoading}
+                    dataProcessingAccepted={dataProcessingAccepted}
+                    onSummarize={summarizeAllTraces}
+                />
             </header>
 
             <div className="flex flex-col flex-1">
