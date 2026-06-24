@@ -123,6 +123,7 @@ from products.warehouse_sources.backend.models.external_data_job import External
 from products.warehouse_sources.backend.models.external_data_schema import (
     ExternalDataSchema,
     sync_old_schemas_with_new_schemas,
+    update_sync_type_config_keys,
 )
 from products.warehouse_sources.backend.models.external_data_source import ExternalDataSource
 from products.warehouse_sources.backend.models.pending_source_credential import PendingSourceCredential
@@ -2956,6 +2957,14 @@ class ExternalDataSourceViewSet(TeamAndOrgViewSetMixin, AccessControlViewSetMixi
         except Exception as e:
             logger.exception("Failed engine-side CDC cleanup during disable_cdc", exc_info=e)
             capture_exception(e, {"source_id": str(instance.id)})
+
+        # Clear any broken marker (recovery contract): leaving a stale cdc_broken in
+        # sync_type_config would make CDC look broken the moment it's re-enabled.
+        for schema_id in cdc_schema_ids:
+            try:
+                update_sync_type_config_keys(schema_id, instance.team_id, removes=["cdc_broken"])
+            except ExternalDataSchema.DoesNotExist:
+                pass
 
         with transaction.atomic():
             # Force CDC schemas to pick a new strategy by clearing sync_type and pausing.
