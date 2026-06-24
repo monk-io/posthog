@@ -267,9 +267,8 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
     })),
 
     listeners(({ actions, values }) => ({
-        // Pre-load conversation titles for the whole list so each row can show its
-        // human title. The loader batches these (and dedupes against its cache), so
-        // re-selecting an already-listed session never re-queries its title.
+        // Pre-load titles for the whole list (batched + deduped), so each row shows
+        // its name and re-selecting a listed session never re-queries its title.
         loadSessionsSuccess: ({ sessions }) => {
             for (const session of sessions) {
                 actions.ensureSessionTitleLoaded(session.sessionId, values.dateFilter)
@@ -277,9 +276,8 @@ export const aiObservabilitySessionsViewLogic = kea<aiObservabilitySessionsViewL
         },
         applyUrlState: () => actions.loadSessions(),
         setSessionsSort: () => actions.loadSessions(),
-        // The date picker, property filters, and test-account toggle mutate shared
-        // state directly (no URL round-trip in this scene), so reload the list when
-        // they change too — otherwise it only refreshed on full page load.
+        // Filters mutate shared state directly (no URL round-trip here), so reload
+        // the list on them too — otherwise it only refreshed on full page load.
         setDates: () => actions.loadSessions(),
         setPropertyFilters: () => actions.loadSessions(),
         setShouldFilterTestAccounts: () => actions.loadSessions(),

@@ -44,8 +44,6 @@ const LLMASessionFeedbackDisplay = lazy(() =>
     import('./LLMASessionFeedbackDisplay').then((m) => ({ default: m.LLMASessionFeedbackDisplay }))
 )
 
-// Playback phase for a turn: the user composing their request, the assistant
-// working on its reply, or the fully-settled turn shown with all its detail.
 type TurnPhase = 'userThinking' | 'aiThinking' | 'complete'
 
 export const scene: SceneExport = {
@@ -115,8 +113,7 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
     const { dataProcessingAccepted } = useValues(maxGlobalLogic)
     const { getSessionTitle } = useValues(llmSessionTitleLazyLoaderLogic)
     const { ensureSessionTitleLoaded } = useActions(llmSessionTitleLazyLoaderLogic)
-    // Compute the URL search-param passthrough once for the page, not per turn —
-    // every `SessionTurnView` consumes the same `traceSearchParams`.
+    // Computed once for the page, not per turn.
     const { searchParams } = useValues(router)
     const traceSearchParams = sanitizeTraceUrlSearchParams(searchParams, { removeSearch: true })
 
@@ -125,13 +122,11 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
     const { togglePlay, setSpeed, seek, setTimeline } = useActions(playback)
     const built = buildSessionTimeline(sessionTurns)
     useEffect(() => {
-        setTimeline(built.turnStartsMs, built.durationMs)
+        setTimeline(built.durationMs)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId, sessionTurns.length])
 
-    // Playback reveals each turn one phase at a time: the user composing (typing
-    // indicator), the request landing, the assistant thinking, then its response.
-    // While the player is idle (untouched) the whole conversation shows at once.
+    // Idle: show the whole conversation. Scrubbing: reveal turns phase by phase.
     const isScrubbing = playing || currentMs > 0
     const revealedTurnCount = isScrubbing
         ? built.turnRevealsMs.reduce((n, revealMs) => (revealMs <= currentMs ? n + 1 : n), 0)
@@ -143,16 +138,13 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
               ? 'aiThinking'
               : 'complete'
 
-    // During playback, keep the most recently revealed turn (and its typing/loading
-    // indicator) in view as turns appear over time. We don't hijack scrolling while
-    // the user is paused/idle — only while the player is actively advancing.
+    // While playing, keep the newest turn in view above the docked player.
     const latestTurnRef = useRef<HTMLDivElement>(null)
     useEffect(() => {
         if (!playing || !latestTurnRef.current) {
             return
         }
-        // Scroll the conversation fully to the bottom so the newest turn — and its
-        // typing/loading indicator — sits above the docked player, not behind it.
+        // Scroll fully to the bottom so the newest turn clears the sticky player.
         let scroller = latestTurnRef.current.parentElement
         while (scroller && scroller.scrollHeight <= scroller.clientHeight) {
             scroller = scroller.parentElement
@@ -168,7 +160,6 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
         featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_SESSION_SUMMARIZATION] ||
         featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_EARLY_ADOPTERS]
 
-    // Calculate session aggregates
     const sessionStats = traces.reduce(
         (acc, trace) => ({
             totalCost: acc.totalCost + (trace.totalCost || 0),
@@ -264,8 +255,7 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
                 )}
             </div>
 
-            {/* The player anchors to the bottom like a session-replay scrubber, so it
-                stays in reach while the conversation reveals and scrolls above it. */}
+            {/* Anchored to the bottom like a session-replay scrubber. */}
             {durationMs > 0 && (
                 <div className="sticky bottom-0 z-10 mt-2 flex flex-col gap-2 rounded border border-primary bg-surface-primary p-3 shadow">
                     <SessionSeekbar
@@ -377,14 +367,11 @@ function SessionTurnView({
     const summaryUrl = combineUrl(urls.aiObservabilityTrace(trace.id), { ...baseTraceParams, tab: 'summary' }).url
 
     const hasTranscript = turn.isLoaded && !!turn.userVisibleTurn
-    // Span-only turns have no transcript to fall back to, so the span tree IS the
-    // conversation — show it directly rather than tucked behind a disclosure.
+    // Span-only turns have no transcript, so the span tree IS the conversation.
     const isSpanOnly = turn.isLoaded && !turn.userVisibleTurn
-    // Mid-playback phases reveal the turn incrementally; only a settled turn shows
-    // its summary, tools, errors, steps, and the trace sidebar.
+    // Only a settled turn shows its summary, tools, errors, steps, and sidebar.
     const isComplete = phase === 'complete'
 
-    // Reveal the Steps panel for this turn, loading the full trace first if needed.
     // Shared by the "Show steps" toggle and the clickable tool pills.
     const openSteps = (): void => {
         if (!fullTrace && !isLoading) {
@@ -413,11 +400,6 @@ function SessionTurnView({
                     {isComplete && turn.tools.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted">
                             {turn.tools.map((name) => (
-                                // Clicking a tool opens this turn's Steps panel. We deliberately
-                                // don't auto-expand the matching span: tool names come from either
-                                // $ai_span events or generation tool_calls, so the name→span mapping
-                                // is lossy, and focusing one needs async trace-load coordination —
-                                // not worth the complexity for a nice-to-have.
                                 <LemonTag
                                     key={name}
                                     size="small"
@@ -457,8 +439,6 @@ function SessionTurnView({
                         </div>
                     )}
 
-                    {/* Per-turn actions sit under the assistant's response — the agent's
-                        steps inline, and the full trace one click away in a new tab. */}
                     {isComplete && hasTranscript && (
                         <div className="flex flex-col gap-1.5">
                             <TurnDisclosure
@@ -511,9 +491,8 @@ function SessionTurnView({
     )
 }
 
-// A small chevron disclosure matching the conversation's other inline controls:
-// a muted label that rotates a caret open and reveals its content below. An optional
-// `action` renders inline beside the label without nesting inside its toggle button.
+// A muted chevron disclosure; an optional `action` renders beside the label,
+// outside its toggle button.
 function TurnDisclosure({
     label,
     expanded,
@@ -604,8 +583,7 @@ function TurnBody({
     if (phase === 'userThinking') {
         return <TypingIndicator type="human" />
     }
-    // The request is in but the response is still "in flight" — show the request plus
-    // an assistant typing indicator until the AI latency window elapses.
+    // Request shown, response still in flight — request plus a typing indicator.
     if (phase === 'aiThinking') {
         return (
             <div className="flex flex-col gap-1.5">

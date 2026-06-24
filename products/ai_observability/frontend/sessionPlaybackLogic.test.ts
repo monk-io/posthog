@@ -12,7 +12,7 @@ describe('sessionPlaybackLogic', () => {
         jest.useFakeTimers()
         logic = sessionPlaybackLogic({ sessionId: 's1' })
         logic.mount()
-        logic.actions.setTimeline([0, 2000, 5000], 6000)
+        logic.actions.setTimeline(6000)
     })
 
     afterEach(() => {
@@ -22,13 +22,6 @@ describe('sessionPlaybackLogic', () => {
 
     it('seeks to an absolute position and pauses', async () => {
         await expectLogic(logic, () => logic.actions.seek(2500)).toMatchValues({ currentMs: 2500, playing: false })
-    })
-
-    it('tracks the visible turn index from the playhead', async () => {
-        logic.actions.seek(2100)
-        await expectLogic(logic).toMatchValues({ visibleTurnIndex: 1 })
-        logic.actions.seek(5000)
-        await expectLogic(logic).toMatchValues({ visibleTurnIndex: 2 })
     })
 
     it('advances on tick scaled by speed and stops at the end', async () => {

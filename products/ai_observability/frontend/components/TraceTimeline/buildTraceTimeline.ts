@@ -65,9 +65,8 @@ export function buildTraceTimeline(events: LLMTraceEvent[]): TraceTimelineData {
         }
     })
 
-    // Greedy lane packing: walk bars in start order and drop each into the first
-    // lane whose previous bar has already ended. Non-overlapping bars share a lane
-    // (stays compact); a nested span lands in its own lane instead of colliding.
+    // Greedy lane packing: each bar drops into the first lane whose previous bar has
+    // ended, so non-overlapping bars share a lane and nested spans don't collide.
     const laneEnds: number[] = []
     for (const i of [...bars.keys()].sort((a, b) => bars[a].startMs - bars[b].startMs)) {
         const bar = bars[i]

@@ -2,10 +2,8 @@ import { useRef } from 'react'
 
 import { cn } from 'lib/utils/css-classes'
 
-// A session-replay-style scrubber: a single track with a progress fill, turn
-// ticks, and a draggable playhead. Clicking/dragging seeks; clicking a tick
-// jumps to that moment. Two tick kinds: the user's message (muted) and the
-// assistant's response (green), so each turn reads user → assistant.
+// A session-replay-style scrubber. Clicking/dragging seeks; ticks jump to a turn —
+// muted = the user's message, green = the assistant's response.
 export function SessionSeekbar({
     durationMs,
     currentMs,

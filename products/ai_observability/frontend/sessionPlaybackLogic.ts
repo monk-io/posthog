@@ -1,4 +1,4 @@
-import { actions, kea, key, listeners, path, props, reducers, selectors } from 'kea'
+import { actions, kea, key, listeners, path, props, reducers } from 'kea'
 
 import type { sessionPlaybackLogicType } from './sessionPlaybackLogicType'
 
@@ -20,9 +20,8 @@ export const sessionPlaybackLogic = kea<sessionPlaybackLogicType>([
         togglePlay: true,
         seek: (ms: number) => ({ ms }),
         setSpeed: (speed: number) => ({ speed }),
-        setTimeline: (turnStartsMs: number[], durationMs: number) => ({ turnStartsMs, durationMs }),
+        setTimeline: (durationMs: number) => ({ durationMs }),
         tick: (deltaMs: number) => ({ deltaMs }),
-        // internal: advance the playhead without pausing (the user-facing `seek` pauses)
         setCurrentMs: (ms: number) => ({ ms }),
     }),
 
@@ -30,7 +29,6 @@ export const sessionPlaybackLogic = kea<sessionPlaybackLogicType>([
         playing: [false, { play: () => true, pause: () => false, seek: () => false }],
         speed: [1, { setSpeed: (_, { speed }) => speed }],
         durationMs: [0, { setTimeline: (_, { durationMs }) => durationMs }],
-        turnStartsMs: [[] as number[], { setTimeline: (_, { turnStartsMs }) => turnStartsMs }],
         currentMs: [
             0,
             {
@@ -41,28 +39,8 @@ export const sessionPlaybackLogic = kea<sessionPlaybackLogicType>([
         ],
     }),
 
-    selectors({
-        visibleTurnIndex: [
-            (s) => [s.turnStartsMs, s.currentMs],
-            (turnStartsMs: number[], currentMs: number): number => {
-                let idx = 0
-                for (let i = 0; i < turnStartsMs.length; i++) {
-                    if (turnStartsMs[i] <= currentMs) {
-                        idx = i
-                    }
-                }
-                return idx
-            },
-        ],
-        progress: [
-            (s) => [s.currentMs, s.durationMs],
-            (currentMs: number, durationMs: number): number => (durationMs > 0 ? currentMs / durationMs : 0),
-        ],
-    }),
-
     listeners(({ actions, values, cache }) => ({
         togglePlay: () => (values.playing ? actions.pause() : actions.play()),
-        // a manual scrub pauses playback and stops the ticker
         seek: () => cache.disposables.dispose('playback-tick'),
         tick: ({ deltaMs }) => {
             const next = Math.min(values.currentMs + deltaMs * values.speed, values.durationMs)
@@ -72,7 +50,6 @@ export const sessionPlaybackLogic = kea<sessionPlaybackLogicType>([
             }
         },
         play: () => {
-            // restart from the beginning if we're already at the end
             if (values.currentMs >= values.durationMs) {
                 actions.setCurrentMs(0)
             }
