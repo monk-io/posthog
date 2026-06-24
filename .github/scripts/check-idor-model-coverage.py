@@ -284,6 +284,13 @@ def get_scoped_models() -> tuple[dict[str, set[str]], set[str], set[str], set[st
         "EventBuffer",
         "EventIngestionRestrictionConfig",
         "MessagingRecord",
+        # Stampede merge queue — instance-global, keyed on `repo` (PostHog's own
+        # monorepo), not on a customer Team. See products/merge_queue/backend/models.py.
+        "Partition",
+        "Enrollment",
+        "Slot",
+        "Trial",
+        "QueueEvent",
     }
 
     # Baseline violations — these models SHOULD have team_id but don't yet.
