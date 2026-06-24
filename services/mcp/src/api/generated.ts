@@ -5024,6 +5024,7 @@ export namespace Schemas {
       LinkedinAds: 'linkedin-ads',
       Snapchat: 'snapchat',
       Stripe: 'stripe',
+      Instagram: 'instagram',
       Intercom: 'intercom',
       Email: 'email',
       Twilio: 'twilio',
