@@ -1,9 +1,9 @@
 import { BindLogic, useActions, useValues } from 'kea'
 import { combineUrl, router } from 'kea-router'
-import { type ReactNode, Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, type Ref, Suspense, lazy, useEffect, useMemo, useRef } from 'react'
 
-import { IconChevronRight, IconWrench } from '@posthog/icons'
-import { LemonButton, LemonTag, Spinner, SpinnerOverlay, Tooltip } from '@posthog/lemon-ui'
+import { IconChevronRight, IconEllipsis, IconExternal, IconWrench } from '@posthog/icons'
+import { LemonButton, LemonMenu, LemonTag, Spinner, SpinnerOverlay, Tooltip } from '@posthog/lemon-ui'
 
 import { AccessControlAction } from 'lib/components/AccessControlAction'
 import { TZLabel } from 'lib/components/TZLabel'
@@ -144,6 +144,16 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
               ? 'aiThinking'
               : 'complete'
 
+    // During playback, keep the most recently revealed turn (and its typing/loading
+    // indicator) in view as turns appear over time. We don't hijack scrolling while
+    // the user is paused/idle — only while the player is actively advancing.
+    const latestTurnRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        if (playing && latestTurnRef.current) {
+            latestTurnRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        }
+    }, [playing, revealedTurnCount, currentMs])
+
     const showSessionSummarization =
         featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_SESSION_SUMMARIZATION] ||
         featureFlags[FEATURE_FLAGS.LLM_ANALYTICS_EARLY_ADOPTERS]
@@ -218,9 +228,11 @@ function SessionSceneWrapper({ showBreadcrumb = false }: { showBreadcrumb?: bool
             </header>
 
             <div className="flex flex-col flex-1">
-                {(isScrubbing ? sessionTurns.slice(0, revealedTurnCount) : sessionTurns).map((turn, i) => (
+                {(isScrubbing ? sessionTurns.slice(0, revealedTurnCount) : sessionTurns).map((turn, i, shown) => (
                     <SessionTurnView
                         key={turn.trace.id}
+                        // Anchor for the player's auto-scroll: the last revealed turn.
+                        rootRef={i === shown.length - 1 ? latestTurnRef : undefined}
                         turn={turn}
                         turnIndex={i}
                         allTurns={sessionTurns}
@@ -332,6 +344,7 @@ function SessionTurnView({
     showSentiment,
     showSessionSummarization,
     traceSearchParams,
+    rootRef,
 }: {
     turn: SessionTurn
     turnIndex: number
@@ -340,12 +353,12 @@ function SessionTurnView({
     showSentiment: boolean
     showSessionSummarization: boolean
     traceSearchParams: Record<string, unknown>
+    rootRef?: Ref<HTMLDivElement>
 }): JSX.Element {
     const { traceSummaries, loadingFullTraces, fullTraces, stepsExpandedTraceIds, expandedGenerationIds } = useValues(
         aiObservabilitySessionDataLogic
     )
     const { toggleSteps, toggleGenerationExpanded, loadFullTrace } = useActions(aiObservabilitySessionDataLogic)
-    const [traceLinksShown, setTraceLinksShown] = useState(false)
 
     const trace = turn.trace
     const summary: TraceSummary | undefined = traceSummaries[trace.id]
@@ -367,15 +380,32 @@ function SessionTurnView({
     // its summary, tools, errors, steps, and the trace sidebar.
     const isComplete = phase === 'complete'
 
+    // Reveal the Steps panel for this turn, loading the full trace first if needed.
+    // Shared by the "Show steps" toggle and the clickable tool pills.
+    const openSteps = (): void => {
+        if (!fullTrace && !isLoading) {
+            loadFullTrace(trace.id)
+        }
+        if (!stepsShown) {
+            toggleSteps(trace.id)
+        }
+    }
+
     return (
-        <div className="flex flex-col">
+        <div className="flex flex-col" ref={rootRef}>
             <div className="flex items-center gap-3 py-3 text-xs text-muted">
                 <div className="flex-1 border-t" />
                 <TZLabel time={trace.createdAt} formatDate="MMM D, YYYY" formatTime="h:mm A" />
                 <div className="flex-1 border-t" />
             </div>
             <div className="flex gap-10 pb-4">
-                <div className="flex-1 min-w-0 flex flex-col gap-2">
+                <div className="relative flex-1 min-w-0 flex flex-col gap-2">
+                    {/* Overflow menu pinned to the top-right of the assistant turn. */}
+                    {isComplete && hasTranscript && turn.outputs.length > 0 && (
+                        <div className="absolute top-0 right-0 z-10">
+                            <TurnActionsMenu turn={turn} turnIndex={turnIndex} allTurns={allTurns} />
+                        </div>
+                    )}
                     {isComplete && showSessionSummarization && summary && (
                         <TurnSummaryLine summary={summary} summaryUrl={summaryUrl} />
                     )}
@@ -384,9 +414,19 @@ function SessionTurnView({
 
                     {isComplete && turn.tools.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted">
-                            <IconWrench className="text-sm shrink-0" />
                             {turn.tools.map((name) => (
-                                <LemonTag key={name} size="small" className="font-mono">
+                                // Clicking a tool opens this turn's Steps panel.
+                                // ponytail: scroll to / highlight the matching span event
+                                // (by `$ai_span_name`) inside StepsPanel — needs an anchor
+                                // (id/data-attr) on AIObservabilityEventCard, which is owned
+                                // by the traces tab and out of scope here.
+                                <LemonTag
+                                    key={name}
+                                    size="small"
+                                    className="font-mono cursor-pointer hover:bg-fill-button-tertiary-hover"
+                                    onClick={openSteps}
+                                    icon={<IconWrench />}
+                                >
                                     {name}
                                 </LemonTag>
                             ))}
@@ -419,8 +459,8 @@ function SessionTurnView({
                         </div>
                     )}
 
-                    {/* Per-turn actions sit under the assistant's response as small
-                        disclosures — the agent's work and trace, one click away. */}
+                    {/* Per-turn actions sit under the assistant's response — the agent's
+                        steps inline, and the full trace one click away in a new tab. */}
                     {isComplete && hasTranscript && (
                         <div className="flex flex-col gap-1.5">
                             <TurnDisclosure
@@ -432,6 +472,16 @@ function SessionTurnView({
                                     }
                                     toggleSteps(trace.id)
                                 }}
+                                action={
+                                    <LemonButton
+                                        size="xsmall"
+                                        icon={<IconExternal />}
+                                        to={traceUrl}
+                                        targetBlank
+                                        tooltip="Open trace in new tab"
+                                        data-attr="llm-session-open-trace"
+                                    />
+                                }
                             >
                                 <StepsPanel
                                     traceId={trace.id}
@@ -440,25 +490,6 @@ function SessionTurnView({
                                     onToggleEventExpand={toggleGenerationExpanded}
                                 />
                             </TurnDisclosure>
-
-                            <TurnDisclosure
-                                label="View trace"
-                                expanded={traceLinksShown}
-                                onToggle={() => setTraceLinksShown((v) => !v)}
-                            >
-                                <div className="flex flex-col gap-1 items-start pl-4">
-                                    <Link to={traceUrl} target="_blank" className="text-xs">
-                                        Open trace
-                                    </Link>
-                                    <Link to={summaryUrl} target="_blank" className="text-xs">
-                                        View summary
-                                    </Link>
-                                </div>
-                            </TurnDisclosure>
-
-                            {turn.outputs.length > 0 && (
-                                <TurnIntoEvalDisclosure turn={turn} turnIndex={turnIndex} allTurns={allTurns} />
-                            )}
                         </div>
                     )}
 
@@ -483,36 +514,43 @@ function SessionTurnView({
 }
 
 // A small chevron disclosure matching the conversation's other inline controls:
-// a muted label that rotates a caret open and reveals its content below.
+// a muted label that rotates a caret open and reveals its content below. An optional
+// `action` renders inline beside the label without nesting inside its toggle button.
 function TurnDisclosure({
     label,
     expanded,
     onToggle,
     children,
+    action,
 }: {
     label: string
     expanded: boolean
     onToggle: () => void
     children: ReactNode
+    action?: ReactNode
 }): JSX.Element {
     return (
         <div className="flex flex-col gap-1.5 text-xs text-muted">
-            <button
-                type="button"
-                className="flex items-center gap-1 self-start hover:text-default cursor-pointer"
-                onClick={onToggle}
-            >
-                <IconChevronRight className={cn('transition-transform', expanded && 'rotate-90')} />
-                <span>{label}</span>
-            </button>
+            <div className="flex items-center gap-1 self-start">
+                <button
+                    type="button"
+                    className="flex items-center gap-1 hover:text-default cursor-pointer"
+                    onClick={onToggle}
+                >
+                    <IconChevronRight className={cn('transition-transform', expanded && 'rotate-90')} />
+                    <span>{label}</span>
+                </button>
+                {action}
+            </div>
             {expanded && children}
         </div>
     )
 }
 
-// Mock: previews turning an assistant response (plus everything before it) into an
-// evaluation case. The capture isn't wired up yet — this just demonstrates the flow.
-function TurnIntoEvalDisclosure({
+// Overflow menu at the top-right of an assistant turn. Single item for now:
+// "Turn into eval" — a mock that previews turning this response (plus everything
+// before it) into an evaluation case. The capture isn't wired up yet.
+function TurnActionsMenu({
     turn,
     turnIndex,
     allTurns,
@@ -521,7 +559,6 @@ function TurnIntoEvalDisclosure({
     turnIndex: number
     allTurns: SessionTurn[]
 }): JSX.Element {
-    const [expanded, setExpanded] = useState(false)
     // Everything the eval would treat as input: every message before this turn's
     // response — all prior turns plus this turn's own request.
     const contextCount = useMemo(
@@ -530,23 +567,17 @@ function TurnIntoEvalDisclosure({
             turn.newInputs.length,
         [allTurns, turnIndex, turn.newInputs.length]
     )
-    const messages = contextCount === 1 ? 'message' : 'messages'
     const createEval = (): void => {
+        const messages = contextCount === 1 ? 'message' : 'messages'
         lemonToast.success(`Evaluation created from this response and ${contextCount} ${messages} of context (mock)`)
-        setExpanded(false)
     }
     return (
-        <TurnDisclosure label="Turn into eval" expanded={expanded} onToggle={() => setExpanded((v) => !v)}>
-            <div className="flex flex-col gap-2 items-start pl-4">
-                <span>
-                    Turns the assistant's response and the {contextCount} {messages} of context before it into an
-                    evaluation case.
-                </span>
-                <LemonButton type="primary" size="xsmall" onClick={createEval}>
-                    Create evaluation
-                </LemonButton>
-            </div>
-        </TurnDisclosure>
+        <LemonMenu
+            items={[{ label: 'Turn into eval', onClick: createEval, 'data-attr': 'llm-session-turn-into-eval' }]}
+            placement="bottom-end"
+        >
+            <LemonButton size="small" noPadding icon={<IconEllipsis />} tooltip="Turn actions" />
+        </LemonMenu>
     )
 }
 
