@@ -27,7 +27,11 @@ function getThreadItemKey(item: ThreadItem): string {
  * `virtualized={false}` when an ancestor already owns scroll (the live Max column + auto-scroller) — rows
  * then render in document flow, unchanged from the pre-virtualized layout.
  */
-export function SandboxThreadView({ virtualized = true }: { virtualized?: boolean } = {}): JSX.Element {
+export function SandboxThreadView({
+    virtualized = true,
+    className,
+    listClassName,
+}: { virtualized?: boolean; className?: string; listClassName?: string } = {}): JSX.Element {
     const { threadItems, toolInvocations, isThinking, streamPhase, runArtifacts, turnComplete, currentRunStatus } =
         useValues(sandboxStreamLogic)
     const turnCancelled = currentRunStatus === 'cancelled'
@@ -84,6 +88,8 @@ export function SandboxThreadView({ virtualized = true }: { virtualized?: boolea
 
     return (
         <VirtualizedThread.Root
+            className={className}
+            listClassName={listClassName}
             items={threadItems}
             getItemKey={getThreadItemKey}
             header={header}

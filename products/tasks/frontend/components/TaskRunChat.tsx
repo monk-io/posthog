@@ -32,6 +32,7 @@ function TaskRunChatContent({ taskId, runId }: TaskRunChatProps): JSX.Element {
             taskId={taskId}
             runId={runId}
             interaction="live"
+            className="flex-1 min-h-0 lg:-mx-4"
             composerValue={composerDraft}
             onComposerChange={setComposerDraft}
             onComposerSubmit={() => sendMessage(composerDraft)}

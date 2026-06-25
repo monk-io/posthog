@@ -73,6 +73,7 @@ export interface VirtualizedThreadRootProps<T> {
      */
     virtualized?: boolean
     children: (item: T, index: number) => ReactNode
+    listClassName?: string
 }
 
 /**
@@ -92,6 +93,7 @@ function Root<T>({
     stickToBottom = true,
     maxWidthClassName = 'max-w-180',
     className,
+    listClassName,
     virtualized = true,
     children,
 }: VirtualizedThreadRootProps<T>): JSX.Element {
@@ -224,32 +226,31 @@ function Root<T>({
 
     return (
         <RootContext.Provider value={rootValue}>
-            <div className={cn('flex flex-col h-full min-h-0 w-full', className)}>
-                <AutoSizer
-                    renderProp={({ height, width }: SizeProps) => {
-                        if (!height || !width) {
-                            return null
-                        }
-                        // react-window sets only `overflowY: auto`, which makes the unset `overflow-x` compute
-                        // to `auto` too — pin it to `hidden` so the thread never scrolls sideways (wide blocks
-                        // like tool output scroll within their own containers).
-                        return (
-                            <List<InternalRowProps>
-                                style={{ height, width, overflowX: 'hidden' }}
-                                className="overscroll-contain"
-                                overscanCount={overscanCount}
-                                rowCount={rowCount}
-                                rowHeight={dynamicRowHeight}
-                                rowComponent={InternalRow}
-                                rowProps={{ renderRow }}
-                                listRef={listRef}
-                                onRowsRendered={handleRowsRendered}
-                                onScroll={handleScroll}
-                            />
-                        )
-                    }}
-                />
-            </div>
+            <AutoSizer
+                className={cn('flex flex-col h-full min-h-0 w-full', className)}
+                renderProp={({ height, width }: SizeProps) => {
+                    if (!height || !width) {
+                        return null
+                    }
+                    // react-window sets only `overflowY: auto`, which makes the unset `overflow-x` compute
+                    // to `auto` too — pin it to `hidden` so the thread never scrolls sideways (wide blocks
+                    // like tool output scroll within their own containers).
+                    return (
+                        <List<InternalRowProps>
+                            style={{ height, width, overflowX: 'hidden' }}
+                            className={cn('overscroll-contain', listClassName)}
+                            overscanCount={overscanCount}
+                            rowCount={rowCount}
+                            rowHeight={dynamicRowHeight}
+                            rowComponent={InternalRow}
+                            rowProps={{ renderRow }}
+                            listRef={listRef}
+                            onRowsRendered={handleRowsRendered}
+                            onScroll={handleScroll}
+                        />
+                    )
+                }}
+            />
         </RootContext.Provider>
     )
 }

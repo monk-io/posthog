@@ -107,7 +107,7 @@ export function TaskDetailPage({ taskId, isMobile }: TaskDetailPageProps): JSX.E
         )
 
     return (
-        <SceneContent className="h-full min-h-0">
+        <SceneContent className="h-full min-h-0 gap-y-0">
             {sceneMenuBarEnabled && task && (
                 <SceneMenuBar>
                     <SceneMenuBarMenu label="File" dataAttr="task-menubar-file">
@@ -166,27 +166,29 @@ export function TaskDetailPage({ taskId, isMobile }: TaskDetailPageProps): JSX.E
                 <>
                     {taskError && <TaskLoadErrorBanner message={taskError} onRetry={loadTask} />}
 
-                    <SceneTitleSection
-                        name={task?.title || 'Task'}
-                        description={null}
-                        resourceType={{ type: 'task' }}
-                        isLoading={isTaskPending}
-                        canEdit={false}
-                        forceBackTo={
-                            isMobile
-                                ? {
-                                      key: 'tasks',
-                                      name: 'Tasks',
-                                      path: urls.taskTracker(),
-                                  }
-                                : undefined
-                        }
-                        actions={titleActions}
-                    />
+                    <header className="flex flex-col gap-y-2">
+                        <SceneTitleSection
+                            name={task?.title || 'Task'}
+                            description={null}
+                            resourceType={{ type: 'task' }}
+                            isLoading={isTaskPending}
+                            canEdit={false}
+                            forceBackTo={
+                                isMobile
+                                    ? {
+                                          key: 'tasks',
+                                          name: 'Tasks',
+                                          path: urls.taskTracker(),
+                                      }
+                                    : undefined
+                            }
+                            actions={titleActions}
+                        />
 
-                    {selectedRun && <TaskRunMetadata selectedRun={selectedRun} />}
+                        {selectedRun && <TaskRunMetadata selectedRun={selectedRun} />}
 
-                    <LemonDivider />
+                        <LemonDivider className="mb-0" />
+                    </header>
 
                     <TaskRunLogState
                         taskId={taskId}
@@ -362,11 +364,7 @@ function TaskRunLogState({
         )
     }
     if (taskId && selectedRun) {
-        return (
-            <div className="flex-1 min-h-0 overflow-hidden -mr-4 pr-4">
-                <TaskRunChat taskId={taskId} runId={selectedRun.id} />
-            </div>
-        )
+        return <TaskRunChat taskId={taskId} runId={selectedRun.id} />
     }
     return selectedRunId ? <TaskRunLogSkeleton /> : null
 }
