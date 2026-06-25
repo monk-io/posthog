@@ -50,18 +50,16 @@ from posthog.hogql_queries.utils.query_date_range import QueryDateRange
 
 from products.mcp_analytics.backend import mcp_harness
 from products.mcp_analytics.backend.constants import MCP_TOOL_CALL_EVENT
-from products.mcp_analytics.backend.hogql_queries.base import mcp_query_date_range, validate_mcp_analytics_access
+from products.mcp_analytics.backend.hogql_queries.base import (
+    EFFECTIVE_TOOL_SQL,
+    NEW_SDK_SOURCE,
+    mcp_query_date_range,
+    tool_scope_exprs,
+    validate_mcp_analytics_access,
+)
 
 if TYPE_CHECKING:
     from posthog.models.user import User
-
-# The new SDK source marker, and the *effective* tool name (the inner tool when the
-# call went through the single-exec wrapper, else the directly-registered tool name).
-# Mirrors EFFECTIVE_TOOL_HOGQL / NEW_SDK_FILTER in the tool-detail frontend logic.
-_NEW_SDK_SOURCE = "posthog_mcp_analytics"
-_EFFECTIVE_TOOL = (
-    "coalesce(nullIf(toString(properties.$mcp_exec_tool_call_name), ''), toString(properties.$mcp_tool_name))"
-)
 
 # A per-row distinct-and-sorted list of resolved harness labels, collected from the
 # token computed in the inner subquery. groupArray evaluates the label per row, so the
@@ -79,8 +77,7 @@ def _tool_call_where(tool: str, date_range: QueryDateRange, *, extra: list[ast.E
         parse_expr("event = {event}", placeholders={"event": ast.Constant(value=MCP_TOOL_CALL_EVENT)}),
         parse_expr("timestamp >= {date_from}", placeholders={"date_from": date_range.date_from_as_hogql()}),
         parse_expr("timestamp <= {date_to}", placeholders={"date_to": date_range.date_to_as_hogql()}),
-        parse_expr(f"{_EFFECTIVE_TOOL} = {{tool}}", placeholders={"tool": ast.Constant(value=tool)}),
-        parse_expr("properties.$mcp_source = {source}", placeholders={"source": ast.Constant(value=_NEW_SDK_SOURCE)}),
+        *tool_scope_exprs(tool),
     ]
     if extra:
         exprs.extend(extra)
@@ -562,7 +559,7 @@ class MCPToolNeighborsQueryRunner(AnalyticsQueryRunner[MCPToolNeighborsQueryResp
                     "timestamp <= {date_to}", placeholders={"date_to": self.query_date_range.date_to_as_hogql()}
                 ),
                 parse_expr(
-                    "properties.$mcp_source = {source}", placeholders={"source": ast.Constant(value=_NEW_SDK_SOURCE)}
+                    "properties.$mcp_source = {source}", placeholders={"source": ast.Constant(value=NEW_SDK_SOURCE)}
                 ),
                 parse_expr(f"notEmpty({_CONV_ID})"),
             ]
@@ -573,7 +570,7 @@ class MCPToolNeighborsQueryRunner(AnalyticsQueryRunner[MCPToolNeighborsQueryResp
                 SELECT
                     {_CONV_ID} AS conv_id,
                     timestamp,
-                    {_EFFECTIVE_TOOL} AS tool
+                    {EFFECTIVE_TOOL_SQL} AS tool
                 FROM events
                 WHERE {{cte_where}}
             )
