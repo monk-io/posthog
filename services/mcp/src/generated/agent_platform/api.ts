@@ -689,6 +689,7 @@ export const AgentApplicationsRevisionsCreateBody = /* @__PURE__ */ zod.object({
                     ])
                 )
                 .default(agentApplicationsRevisionsCreateBodySpecIdentityProvidersDefault),
+            authoritative_provider: zod.string().min(1).optional(),
             secrets: zod
                 .array(
                     zod.union([
@@ -1397,6 +1398,7 @@ export const AgentApplicationsRevisionsPartialUpdateBody = /* @__PURE__ */ zod.o
                     ])
                 )
                 .default(agentApplicationsRevisionsPartialUpdateBodySpecIdentityProvidersDefault),
+            authoritative_provider: zod.string().min(1).optional(),
             secrets: zod
                 .array(
                     zod.union([

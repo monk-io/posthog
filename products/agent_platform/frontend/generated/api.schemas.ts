@@ -553,6 +553,8 @@ export type AgentRevisionApiSpec = {
     mcps: AgentRevisionApiSpecMcpsItem[]
     skills: AgentRevisionApiSpecSkillsItem[]
     identity_providers?: AgentRevisionApiSpecIdentityProvidersItem[]
+    /** @minLength 1 */
+    authoritative_provider?: string
     secrets: AgentRevisionApiSpecSecretsItem[]
     limits: AgentRevisionApiSpecLimits
     entrypoint: string
@@ -956,6 +958,8 @@ export type PatchedAgentRevisionApiSpec = {
     mcps: PatchedAgentRevisionApiSpecMcpsItem[]
     skills: PatchedAgentRevisionApiSpecSkillsItem[]
     identity_providers?: PatchedAgentRevisionApiSpecIdentityProvidersItem[]
+    /** @minLength 1 */
+    authoritative_provider?: string
     secrets: PatchedAgentRevisionApiSpecSecretsItem[]
     limits: PatchedAgentRevisionApiSpecLimits
     entrypoint: string

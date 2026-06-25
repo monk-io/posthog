@@ -8408,6 +8408,8 @@ export namespace Schemas {
       mcps: AgentRevisionSpecMcpsItem[];
       skills: AgentRevisionSpecSkillsItem[];
       identity_providers?: AgentRevisionSpecIdentityProvidersItem[];
+      /** @minLength 1 */
+      authoritative_provider?: string;
       secrets: AgentRevisionSpecSecretsItem[];
       limits: AgentRevisionSpecLimits;
       entrypoint: string;
@@ -34982,6 +34984,8 @@ export namespace Schemas {
       mcps: PatchedAgentRevisionSpecMcpsItem[];
       skills: PatchedAgentRevisionSpecSkillsItem[];
       identity_providers?: PatchedAgentRevisionSpecIdentityProvidersItem[];
+      /** @minLength 1 */
+      authoritative_provider?: string;
       secrets: PatchedAgentRevisionSpecSecretsItem[];
       limits: PatchedAgentRevisionSpecLimits;
       entrypoint: string;
