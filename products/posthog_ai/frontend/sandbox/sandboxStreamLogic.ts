@@ -1059,6 +1059,12 @@ export const sandboxStreamLogic = kea<sandboxStreamLogicType>([
         /** Internal: the live run history snapshot finished loading or was intentionally skipped. */
         bootstrapLogReady: true,
         closeSse: true,
+        /**
+         * The conversations/open POST is in flight — drives the optimistic "spinning up" indicator
+         * before any SSE state exists. The caller (maxThreadLogic) flips it on before the POST and off
+         * on the no-handle/failure paths; the success path lets `openSseForRun` clear it via the reducer.
+         */
+        setRunOpening: (opening: boolean) => ({ opening }),
         sseConnecting: true,
         sseOpened: true,
         sseReconnecting: (attempt: number) => ({ attempt }),
@@ -1164,6 +1170,21 @@ export const sandboxStreamLogic = kea<sandboxStreamLogicType>([
         reset: true,
     }),
     reducers({
+        // True while the conversations/open POST is in flight, before any SSE state exists. Folds into
+        // `streamPhase` as provisioning so the thread shows the optimistic "spinning up" indicator
+        // immediately on send. Cleared once a real stream lifecycle takes over (or ends/errors).
+        runOpening: [
+            false,
+            {
+                setRunOpening: (_, { opening }) => opening,
+                openSseForRun: () => false,
+                sseOpened: () => false,
+                handleStreamError: () => false,
+                handleTerminalStatus: () => false,
+                pushErrorItem: () => false,
+                reset: () => false,
+            },
+        ],
         sseStatus: [
             'idle' as SandboxSseStatus,
             {
@@ -1457,22 +1478,32 @@ export const sandboxStreamLogic = kea<sandboxStreamLogicType>([
         ],
         /**
          * Stream lifecycle phase gating the bottom-of-thread thinking indicator. `provisioning` = the
-         * cold-boot window — the stream is opening or open but the agent hasn't started yet (the
-         * workflow is still setting up the sandbox); it holds the gerund loader off until `run_started`
-         * so it can't show before a turn begins. Boot UX is surfaced by `_posthog/progress` items, not
-         * a dedicated indicator. `thinking` = the agent is working a turn (mirrors `isThinking`), and is
+         * cold-boot window — the conversations/open POST is in flight (`runOpening`), or the stream is
+         * opening/open but the agent hasn't started yet (the workflow is still setting up the sandbox).
+         * `SandboxThreadView` shows a fixed "spinning up" indicator here until a real `_posthog/progress`
+         * boot step lands (which then takes over) or `run_started` flips the phase to `thinking`. The
+         * playful gerund loader is held off until `thinking` so it never shows before a turn begins.
+         * `thinking` = the agent is working a turn (mirrors `isThinking`), and is
          * what `SandboxThreadView` gates the gerund loader on; `idle` otherwise (terminal, errored, or
          * not yet connecting). A read-only viewer is always `idle` — it never streams.
          */
         streamPhase: [
-            (s, p) => [s.runStarted, s.isThinking, s.currentRunStatus, s.sseStatus, p.replayOnly!],
-            (runStarted, isThinking, currentRunStatus, sseStatus, replayOnly): 'provisioning' | 'thinking' | 'idle' => {
+            (s, p) => [s.runStarted, s.isThinking, s.currentRunStatus, s.sseStatus, s.runOpening, p.replayOnly!],
+            (
+                runStarted,
+                isThinking,
+                currentRunStatus,
+                sseStatus,
+                runOpening,
+                replayOnly
+            ): 'provisioning' | 'thinking' | 'idle' => {
                 // A read-only snapshot never provisions or thinks — there is no live stream behind it.
                 if (replayOnly) {
                     return 'idle'
                 }
                 const connecting = sseStatus === 'connecting' || sseStatus === 'open' || sseStatus === 'reconnecting'
-                if (connecting && !runStarted && !isTerminalRunStatus(currentRunStatus)) {
+                // `runOpening` covers the conversations/open POST window, before any SSE state exists.
+                if ((connecting || runOpening) && !runStarted && !isTerminalRunStatus(currentRunStatus)) {
                     return 'provisioning'
                 }
                 if (isThinking) {

@@ -49,21 +49,24 @@ export function SandboxThreadView({ virtualized = true }: { virtualized?: boolea
         [branch, baseBranch, repo]
     )
 
-    const showThinking = streamPhase === 'thinking' && !hasActiveProgressItem
+    const thinkingPhase =
+        !hasActiveProgressItem && (streamPhase === 'thinking' || streamPhase === 'provisioning')
+            ? streamPhase
+            : undefined
     // Post-turn only: a reconnect refetch can fold in a pr_url mid-run, so gate on !isThinking.
     const pullRequestUrl = !isThinking ? runArtifacts.prUrl : undefined
     const footer = useMemo(
         () =>
-            showThinking || pullRequestUrl ? (
+            thinkingPhase || pullRequestUrl ? (
                 <VirtualizedThread.Row>
                     <SandboxThreadFooter
-                        showThinking={showThinking}
+                        thinkingPhase={thinkingPhase}
                         pullRequestUrl={pullRequestUrl}
                         prBranch={branch}
                     />
                 </VirtualizedThread.Row>
             ) : undefined,
-        [showThinking, pullRequestUrl, branch]
+        [thinkingPhase, pullRequestUrl, branch]
     )
 
     const renderItem = useCallback(
@@ -115,18 +118,18 @@ const SandboxThreadHeader = memo(function SandboxThreadHeader({
  * re-renders `SandboxThreadView` or destabilizes the footer's element identity during streaming.
  */
 const SandboxThreadFooter = memo(function SandboxThreadFooter({
-    showThinking,
+    thinkingPhase,
     pullRequestUrl,
     prBranch,
 }: {
-    showThinking: boolean
+    thinkingPhase?: 'thinking' | 'provisioning'
     pullRequestUrl?: string
     prBranch?: string
 }): JSX.Element {
     const { currentProgress } = useValues(sandboxStreamLogic)
     return (
         <>
-            {showThinking && <SandboxThinkingIndicator progress={currentProgress} />}
+            {thinkingPhase && <SandboxThinkingIndicator progress={currentProgress} phase={thinkingPhase} />}
             {pullRequestUrl && <SandboxPullRequestCard prUrl={pullRequestUrl} branch={prBranch} />}
         </>
     )
@@ -134,12 +137,19 @@ const SandboxThreadFooter = memo(function SandboxThreadFooter({
 
 /**
  * Bottom-of-thread "what's it doing right now" line for sandbox conversations. Reflects the latest
- * `_posthog/progress` message when present, otherwise the canned thinking rotation.
+ * `_posthog/progress` message when present; during `provisioning` (the conversations/open POST / cold
+ * boot before `run_started`) it shows a fixed "spinning up" message, otherwise the canned thinking rotation.
  */
-function SandboxThinkingIndicator({ progress }: { progress: string | null }): JSX.Element {
+function SandboxThinkingIndicator({
+    progress,
+    phase,
+}: {
+    progress: string | null
+    phase: 'thinking' | 'provisioning'
+}): JSX.Element {
     // One roll per mount — re-rolling on every progress transition would visibly swap the verb.
     const fallbackMessage = useMemo(() => getRandomThinkingMessage(), [])
-    const message = progress?.trim() ? progress : fallbackMessage
+    const message = progress?.trim() ? progress : phase === 'provisioning' ? 'Spinning up sandbox…' : fallbackMessage
     // Match the LangGraph loader: a bubble-free reasoning line (muted brain icon + muted text),
     // static (no shimmer), via the shared Activity primitive — not a MessageTemplate bubble.
     return <ReasoningAnswer content={message} id="sandbox-thinking" completed={false} showCompletionIcon={false} />
