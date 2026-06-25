@@ -25,6 +25,7 @@ import { setupExpressApp } from '~/api/router'
 import { HogFlow } from '~/cdp/schema/hogflow'
 import { InternalPersonWithDistinctId, PersonReadRepository } from '~/common/persons/repositories/person-repository'
 import { deleteKeysWithPrefix } from '~/common/redis/_tests/redis'
+import { InternalFetchService } from '~/common/services/internal-fetch'
 import { createCdpConsumerDeps } from '~/tests/helpers/cdp'
 import { waitForExpect } from '~/tests/helpers/expectations'
 import { TEST_KAFKA_TOPICS, ensureKafkaTopics } from '~/tests/helpers/kafka'
@@ -49,8 +50,9 @@ import { CdpCyclotronWorkerHogFlow } from './consumers/cdp-cyclotron-worker-hogf
 import { CdpDatawarehouseEventsConsumer } from './consumers/cdp-data-warehouse-events.consumer'
 import { CdpEventsConsumer } from './consumers/cdp-events.consumer'
 import { CdpHogflowSubscriptionMatcherConsumer } from './consumers/cdp-hogflow-subscription-matcher.consumer'
-import { CyclotronV2Manager } from './services/cyclotron-v2'
-import { serializeResolverState } from './services/hogflows/batch-resolver.types'
+import { CyclotronV2Manager, CyclotronV2Worker } from './services/cyclotron-v2'
+import { HOGFLOW_BATCH_RESOLVE_QUEUE, serializeResolverState } from './services/hogflows/batch-resolver.types'
+import { HogFlowBatchPersonQueryService } from './services/hogflows/hogflow-batch-person-query.service'
 import { CyclotronJobQueueKafka } from './services/job-queue/job-queue-kafka'
 import { CyclotronJobQueuePostgres } from './services/job-queue/job-queue-postgres'
 import { CyclotronJobQueuePostgresV2 } from './services/job-queue/job-queue-postgres-v2'
@@ -2704,6 +2706,19 @@ describe('Workflows E2E: batch resolver dispatch via cdp-api', () => {
         await resolverWorker?.stop()
     })
 
+    // Fresh worker per test — stop() disconnects the underlying Postgres pool,
+    // so a shared instance can't survive past the first test's afterEach.
+    function buildResolverConsumer(): CdpCyclotronWorkerBatchResolve {
+        const cyclotronWorker = new CyclotronV2Worker({
+            pool: { dbUrl: CYCLOTRON_NODE_DB_URL, maxConnections: 10 },
+            queueName: HOGFLOW_BATCH_RESOLVE_QUEUE,
+            pollDelayMs: 100,
+        })
+        const internalFetchService = new InternalFetchService(hub.INTERNAL_API_BASE_URL, hub.INTERNAL_API_SECRET)
+        const queryService = new HogFlowBatchPersonQueryService(internalFetchService)
+        return new CdpCyclotronWorkerBatchResolve(hub, deps, cyclotronWorker, queryService, internalFetchService)
+    }
+
     async function insertActiveBatchFlow(): Promise<HogFlow> {
         const flow = new FixtureHogFlowBuilder()
             .withTeamId(team.id)
@@ -2888,7 +2903,7 @@ describe('Workflows E2E: batch resolver dispatch via cdp-api', () => {
         // Start the consumer — it'll pick up the resolver job and process pages
         // on its own polling loop. waitForExpect waits for the terminal Django
         // PUT, which only happens after all 3 pages + the terminal-write phase.
-        resolverWorker = new CdpCyclotronWorkerBatchResolve(hub, deps)
+        resolverWorker = buildResolverConsumer()
         await resolverWorker.start()
 
         await waitForExpect(() => {
@@ -2945,7 +2960,7 @@ describe('Workflows E2E: batch resolver dispatch via cdp-api', () => {
         // with an empty cache, so refresh isn't strictly needed — but be
         // explicit so the test isn't sensitive to cache lifecycle changes.
 
-        resolverWorker = new CdpCyclotronWorkerBatchResolve(hub, deps)
+        resolverWorker = buildResolverConsumer()
         await resolverWorker.start()
 
         await waitForExpect(() => {
@@ -3002,7 +3017,7 @@ describe('Workflows E2E: batch resolver dispatch via cdp-api', () => {
             .send({ filters: { filter_test_accounts: false }, max_audience_size: 1000 })
             .expect(200)
 
-        resolverWorker = new CdpCyclotronWorkerBatchResolve(hub, deps)
+        resolverWorker = buildResolverConsumer()
         await resolverWorker.start()
 
         // Wait until at least one Django PUT attempt has happened — proves the
@@ -3044,7 +3059,7 @@ describe('Workflows E2E: batch resolver dispatch via cdp-api', () => {
             .send({ filters: { filter_test_accounts: false }, max_audience_size: 1000 })
             .expect(200)
 
-        resolverWorker = new CdpCyclotronWorkerBatchResolve(hub, deps)
+        resolverWorker = buildResolverConsumer()
         await resolverWorker.start()
 
         await waitForExpect(() => {
@@ -3117,7 +3132,7 @@ describe('Workflows E2E: batch resolver dispatch via cdp-api', () => {
             state: cappedState,
         })
 
-        resolverWorker = new CdpCyclotronWorkerBatchResolve(hub, deps)
+        resolverWorker = buildResolverConsumer()
         await resolverWorker.start()
 
         await waitForExpect(() => {
@@ -3155,7 +3170,7 @@ describe('Workflows E2E: batch resolver dispatch via cdp-api', () => {
             Promise.reject(new Error(`Unexpected internalFetch call to ${url}`))
         )
 
-        resolverWorker = new CdpCyclotronWorkerBatchResolve(hub, deps)
+        resolverWorker = buildResolverConsumer()
         await resolverWorker.start()
 
         await waitForExpect(async () => {
