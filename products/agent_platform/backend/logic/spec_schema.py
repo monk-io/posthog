@@ -473,6 +473,11 @@ _AGENT_SPEC_JSON_SCHEMA_RAW: dict[str, Any] = {
                 ]
             },
         },
+        # The single authoritative identity provider (refs an identity_providers[]
+        # id). When set, every inbound request must resolve a verified identity
+        # from it before a session runs (admission). Optional → not in `required`.
+        # Keep in lockstep with `authoritative_provider` in spec.ts.
+        "authoritative_provider": {"type": "string", "minLength": 1},
         # Two accepted forms — mirrors `SecretRefSchema` in
         # services/agent-shared/src/spec/spec.ts. The bare-string form
         # declares a resolvable name without authority to be sent over the

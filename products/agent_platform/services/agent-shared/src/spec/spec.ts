@@ -782,6 +782,17 @@ export const AgentSpecSchema = z.object({
     skills: z.array(SkillRefSchema).default([]),
     /** Identity providers users can link against (the credential axis). */
     identity_providers: z.array(IdentityProviderConfigSchema).default([]),
+    /**
+     * The ONE provider that gates admission and is the source-of-truth identity.
+     * Must reference an `identity_providers[]` entry that establishes identity.
+     * When set, every inbound request (regardless of transport) must resolve a
+     * verified identity from this provider before a session runs — the ingress
+     * either finds a durable transport→identity binding, verifies a per-request
+     * credential, or returns an auth block. When unset, the transport claim is
+     * the identity (passthrough / public agents). All OTHER identity_providers
+     * link as secondary credentials to the authoritative (canonical) identity.
+     */
+    authoritative_provider: z.string().min(1).optional(),
     secrets: z.array(SecretRefSchema).default([]),
     limits: SpecLimitsSchema.default({
         max_turns: 50,
