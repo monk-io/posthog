@@ -18,33 +18,6 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 from posthog.models import Team
-from posthog.temporal.data_imports.external_data_job import (
-    Any_Source_Errors,
-    ExternalDataJobWorkflow,
-    ExternalDataWorkflowInputs,
-    UpdateExternalDataJobStatusInputs,
-    create_source_templates,
-    update_external_data_job_model,
-)
-from posthog.temporal.data_imports.pipelines.pipeline.pipeline import PipelineNonDLT
-from posthog.temporal.data_imports.settings import import_data_activity_sync
-from posthog.temporal.data_imports.sources.stripe.constants import (
-    BALANCE_TRANSACTION_RESOURCE_NAME as STRIPE_BALANCE_TRANSACTION_RESOURCE_NAME,
-    CHARGE_RESOURCE_NAME as STRIPE_CHARGE_RESOURCE_NAME,
-    CUSTOMER_RESOURCE_NAME as STRIPE_CUSTOMER_RESOURCE_NAME,
-)
-from posthog.temporal.data_imports.sources.stripe.settings import ENDPOINTS as STRIPE_ENDPOINTS
-from posthog.temporal.data_imports.workflow_activities.calculate_table_size import calculate_table_size_activity
-from posthog.temporal.data_imports.workflow_activities.check_billing_limits import check_billing_limits_activity
-from posthog.temporal.data_imports.workflow_activities.create_job_model import (
-    CreateExternalDataJobModelActivityInputs,
-    create_external_data_job_model_activity,
-)
-from posthog.temporal.data_imports.workflow_activities.import_data_sync import ImportDataActivityInputs
-from posthog.temporal.data_imports.workflow_activities.sync_new_schemas import (
-    SyncNewSchemasActivityInputs,
-    sync_new_schemas_activity,
-)
 
 from products.warehouse_sources.backend.models.external_data_job import ExternalDataJob, get_latest_run_if_exists
 from products.warehouse_sources.backend.models.external_data_schema import (
@@ -52,6 +25,41 @@ from products.warehouse_sources.backend.models.external_data_schema import (
     get_all_schemas_for_source_id,
 )
 from products.warehouse_sources.backend.models.external_data_source import ExternalDataSource
+from products.warehouse_sources.backend.temporal.data_imports.external_data_job import (
+    Any_Source_Errors,
+    ExternalDataJobWorkflow,
+    ExternalDataWorkflowInputs,
+    UpdateExternalDataJobStatusInputs,
+    create_source_templates,
+    update_external_data_job_model,
+)
+from products.warehouse_sources.backend.temporal.data_imports.pipelines.pipeline.pipeline import PipelineNonDLT
+from products.warehouse_sources.backend.temporal.data_imports.settings import import_data_activity_sync
+from products.warehouse_sources.backend.temporal.data_imports.sources.stripe.constants import (
+    BALANCE_TRANSACTION_RESOURCE_NAME as STRIPE_BALANCE_TRANSACTION_RESOURCE_NAME,
+    CHARGE_RESOURCE_NAME as STRIPE_CHARGE_RESOURCE_NAME,
+    CUSTOMER_RESOURCE_NAME as STRIPE_CUSTOMER_RESOURCE_NAME,
+)
+from products.warehouse_sources.backend.temporal.data_imports.sources.stripe.settings import (
+    ENDPOINTS as STRIPE_ENDPOINTS,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.calculate_table_size import (
+    calculate_table_size_activity,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.check_billing_limits import (
+    check_billing_limits_activity,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.create_job_model import (
+    CreateExternalDataJobModelActivityInputs,
+    create_external_data_job_model_activity,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.import_data_sync import (
+    ImportDataActivityInputs,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.sync_new_schemas import (
+    SyncNewSchemasActivityInputs,
+    sync_new_schemas_activity,
+)
 
 BUCKET_NAME = "test-pipeline"
 SESSION = boto3.Session()
@@ -311,7 +319,7 @@ def test_sync_new_schemas_activity_self_destructs_when_source_unavailable(
     inputs = SyncNewSchemasActivityInputs(source_id=source_id, team_id=team.id)
 
     with mock.patch(
-        "posthog.temporal.data_imports.workflow_activities.sync_new_schemas.delete_discover_schemas_schedule"
+        "products.warehouse_sources.backend.temporal.data_imports.workflow_activities.sync_new_schemas.delete_discover_schemas_schedule"
     ) as mock_delete_schedule:
         with pytest.raises(Exception, match="Source no longer exists"):
             activity_environment.run(sync_new_schemas_activity, inputs)
@@ -588,7 +596,9 @@ async def test_update_external_job_activity_with_tls_handshake_failure_is_non_re
 
 @pytest.fixture
 def mock_stripe_client():
-    with mock.patch("posthog.temporal.data_imports.sources.stripe.stripe.StripeClient") as MockStripeClient:
+    with mock.patch(
+        "products.warehouse_sources.backend.temporal.data_imports.sources.stripe.stripe.StripeClient"
+    ) as MockStripeClient:
         mock_balance_transaction_list = mock.MagicMock()
         mock_charges_list = mock.MagicMock()
         mock_customers_list = mock.MagicMock()

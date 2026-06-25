@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Optional, cast
 
-from posthog.temporal.data_imports.sources.common.webhook_s3 import WebhookSourceManager
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.webhook_s3 import WebhookSourceManager
 
 if TYPE_CHECKING:
     from posthog.cdp.templates.hog_function_template import HogFunctionTemplateDC
@@ -19,8 +19,12 @@ from posthog.schema import (
 
 from posthog.exceptions_capture import capture_exception
 from posthog.models.integration import OauthIntegration
-from posthog.temporal.data_imports.pipelines.pipeline.typings import SourceInputs, SourceResponse
-from posthog.temporal.data_imports.sources.common.base import (
+
+from products.warehouse_sources.backend.temporal.data_imports.pipelines.pipeline.typings import (
+    SourceInputs,
+    SourceResponse,
+)
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.base import (
     ExternalWebhookInfo,
     FieldType,
     ResumableSource,
@@ -29,12 +33,12 @@ from posthog.temporal.data_imports.sources.common.base import (
     WebhookSource,
     WebhookSyncResult,
 )
-from posthog.temporal.data_imports.sources.common.mixins import OAuthMixin
-from posthog.temporal.data_imports.sources.common.registry import SourceRegistry
-from posthog.temporal.data_imports.sources.common.resumable import ResumableSourceManager
-from posthog.temporal.data_imports.sources.common.schema import SourceSchema
-from posthog.temporal.data_imports.sources.generated_configs import StripeSourceConfig
-from posthog.temporal.data_imports.sources.stripe.constants import (
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.mixins import OAuthMixin
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.registry import SourceRegistry
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.resumable import ResumableSourceManager
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.schema import SourceSchema
+from products.warehouse_sources.backend.temporal.data_imports.sources.generated_configs import StripeSourceConfig
+from products.warehouse_sources.backend.temporal.data_imports.sources.stripe.constants import (
     CHARGE_RESOURCE_NAME,
     CUSTOMER_RESOURCE_NAME,
     DEFAULT_STRIPE_API_VERSION,
@@ -44,12 +48,12 @@ from posthog.temporal.data_imports.sources.stripe.constants import (
     STRIPE_API_VERSIONS,
     SUBSCRIPTION_RESOURCE_NAME,
 )
-from posthog.temporal.data_imports.sources.stripe.settings import (
+from products.warehouse_sources.backend.temporal.data_imports.sources.stripe.settings import (
     APPEND_ONLY_INCREMENTAL_FIELDS as STRIPE_APPEND_ONLY_INCREMENTAL_FIELDS,
     ENDPOINTS as STRIPE_ENDPOINTS,
     WEBHOOK_ONLY_ENDPOINTS as STRIPE_WEBHOOK_ONLY_ENDPOINTS,
 )
-from posthog.temporal.data_imports.sources.stripe.stripe import (
+from products.warehouse_sources.backend.temporal.data_imports.sources.stripe.stripe import (
     StripeAuthenticationError,
     StripePermissionError,
     StripeResumeConfig,
@@ -63,8 +67,7 @@ from posthog.temporal.data_imports.sources.stripe.stripe import (
     update_webhook_events,
     validate_credentials as validate_stripe_credentials,
 )
-
-from products.data_warehouse.backend.types import ExternalDataSourceType
+from products.warehouse_sources.backend.types import ExternalDataSourceType
 
 STRIPE_BASE_URL = "https://dashboard.stripe.com"
 STRIPE_ACCOUNT_URL = f"{STRIPE_BASE_URL}/settings/account"
@@ -102,7 +105,7 @@ class StripeSource(
 
     @property
     def webhook_template(self) -> Optional["HogFunctionTemplateDC"]:
-        from posthog.temporal.data_imports.sources.stripe.webhook_template import template
+        from products.warehouse_sources.backend.temporal.data_imports.sources.stripe.webhook_template import template
 
         return template
 
