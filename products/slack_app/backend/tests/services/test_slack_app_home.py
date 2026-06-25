@@ -391,6 +391,7 @@ class TestTasksCard:
             "repository": "posthog/posthog",
             "pr_url": "https://github.com/posthog/posthog/pull/123",
             "thread_url": "https://slack.com/archives/C1/p1234567890123456",
+            "updated_at_label": "5m ago",
         }
         defaults.update(overrides)
         return TaskItem(**defaults)
@@ -408,7 +409,8 @@ class TestTasksCard:
     def test_first_use_state_invites_user_to_mention(self):
         view = render_home_view(**self._kwargs(tasks_state=TasksState()))
         text = _all_text(view)
-        assert "Tasks" in text
+        # Title carries the hog emoji.
+        assert "🦔 Tasks" in text
         assert "Mention @PostHog" in text
         # No table, no pagination when there are no mappings yet.
         assert self._data_table(view) is None
@@ -428,24 +430,22 @@ class TestTasksCard:
         # Header row + one row per item.
         assert len(table["rows"]) == 3
         header_cells = [cell.get("text") for cell in table["rows"][0]]
-        assert header_cells == ["Task", "Repo", "Status", "Thread", "PR"]
+        assert header_cells == ["Task", "Status", "Thread", "Repo", "PR", "Updated"]
 
     def test_table_cells_carry_links_and_status_label(self):
         state = TasksState(items=(self._item(),), has_any_tasks=True, total_pages=1, total_filtered=1)
         table = self._data_table(render_home_view(**self._kwargs(tasks_state=state)))
         assert table is not None
         body = table["rows"][1]
-        # Title is a rich_text link to PostHog.
+        # Columns: Task | Status | Thread | Repo | PR | Updated
         title_link = body[0]["elements"][0]["elements"][0]
         assert title_link["url"] == "https://app/project/1/tasks/abc"
         assert title_link["text"] == "Fix flaky retention test"
-        # Repo is plain raw_text.
-        assert body[1]["text"] == "posthog/posthog"
-        # Status uses the friendly label.
-        assert body[2]["text"] == "🔄 In progress"
-        # Thread + PR render as links.
-        assert body[3]["elements"][0]["elements"][0]["url"] == "https://slack.com/archives/C1/p1234567890123456"
+        assert body[1]["text"] == "🔄 In progress"
+        assert body[2]["elements"][0]["elements"][0]["url"] == "https://slack.com/archives/C1/p1234567890123456"
+        assert body[3]["text"] == "posthog/posthog"
         assert body[4]["elements"][0]["elements"][0]["url"] == "https://github.com/posthog/posthog/pull/123"
+        assert body[5]["text"] == "5m ago"
 
     def test_repo_dropdown_hidden_when_only_one_repo(self):
         state = TasksState(
@@ -473,24 +473,27 @@ class TestTasksCard:
         assert self._data_table(view) is None
 
     def test_pagination_buttons_render_with_target_pages(self):
-        from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_PAGE, ACTION_TASKS_REFRESH
+        from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_PAGE
 
         state = TasksState(
             items=(self._item(),),
             has_any_tasks=True,
             page=1,
             total_pages=3,
-            total_filtered=21,
+            total_filtered=42,
         )
         view = render_home_view(**self._kwargs(tasks_state=state))
-        # Find the pagination actions block (it's the last `actions` block).
-        actions_blocks = [b for b in view["blocks"] if b.get("type") == "actions"]
-        pagination = actions_blocks[-1]
-        action_ids_present = [el["action_id"] for el in pagination["elements"]]
+        pagination = next(
+            b
+            for b in view["blocks"]
+            if b.get("type") == "actions" and all(el.get("action_id") == ACTION_TASKS_PAGE for el in b["elements"])
+        )
         values_present = [el.get("value") for el in pagination["elements"]]
-        # Prev (page 0), refresh-at-current (page 1), next (page 2).
-        assert action_ids_present == [ACTION_TASKS_PAGE, ACTION_TASKS_REFRESH, ACTION_TASKS_PAGE]
-        assert values_present == ["0", "1", "2"]
+        assert values_present == ["0", "2"]
+        # Page indicator + result count render as a context block above.
+        text = _all_text(view)
+        assert "Page" in text and "2" in text and "of" in text and "3" in text
+        assert "42 tasks" in text
 
     def test_pagination_hidden_when_only_one_page(self):
         state = TasksState(items=(self._item(),), has_any_tasks=True, page=0, total_pages=1, total_filtered=1)
@@ -498,6 +501,21 @@ class TestTasksCard:
         from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_PAGE
 
         assert ACTION_TASKS_PAGE not in _action_ids(view)
+
+    def test_refresh_button_in_controls_carries_current_page(self):
+        from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_REFRESH
+
+        state = TasksState(items=(self._item(),), has_any_tasks=True, page=2, total_pages=3, total_filtered=42)
+        view = render_home_view(**self._kwargs(tasks_state=state))
+        controls = next(
+            b
+            for b in view["blocks"]
+            if b.get("type") == "actions" and any(el.get("action_id") == ACTION_TASKS_REFRESH for el in b["elements"])
+        )
+        refresh_el = next(el for el in controls["elements"] if el["action_id"] == ACTION_TASKS_REFRESH)
+        # Refresh keeps the current page so a click reloads the same view
+        # rather than snapping back to 0.
+        assert refresh_el["value"] == "2"
 
 
 class TestRenderEditModal:

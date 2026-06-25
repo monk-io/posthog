@@ -16,6 +16,7 @@ in `products/slack_app/backend/api.py` are the ones that actually call
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal
 
 from django.core.exceptions import ValidationError
@@ -273,7 +274,7 @@ class ProjectState:
 
 @dataclass(frozen=True)
 class TaskItem:
-    """One row on the Tasks card."""
+    """One row in the Tasks data_table."""
 
     title: str
     posthog_url: str
@@ -281,6 +282,7 @@ class TaskItem:
     repository: str | None
     pr_url: str | None
     thread_url: str | None
+    updated_at_label: str
 
 
 @dataclass(frozen=True)
@@ -655,7 +657,7 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
     `data_table` so columns stay aligned without us hand-rolling fixed-width
     text. A pagination strip below the table jumps between pages.
     """
-    blocks: list[dict] = [_section_title("Tasks", "Tasks you started by mentioning @PostHog.")]
+    blocks: list[dict] = [_section_title("🦔 Tasks", "Tasks you started by mentioning @PostHog.")]
 
     if state.has_any_tasks:
         blocks.append(_tasks_controls_block(state))
@@ -672,7 +674,7 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
     blocks.append(_tasks_data_table(state))
 
     if state.total_pages > 1:
-        blocks.append(_tasks_pagination_block(state))
+        blocks.extend(_tasks_pagination_blocks(state))
 
     return blocks
 
@@ -683,20 +685,22 @@ _TABLE_EMPTY_CELL = "—"
 def _tasks_data_table(state: TasksState) -> dict:
     header = [
         _rt_raw("Task"),
-        _rt_raw("Repo"),
         _rt_raw("Status"),
         _rt_raw("Thread"),
+        _rt_raw("Repo"),
         _rt_raw("PR"),
+        _rt_raw("Updated"),
     ]
     rows: list[list[dict]] = [header]
     for item in state.items:
         rows.append(
             [
                 _rt_link(item.posthog_url, item.title) if item.posthog_url else _rt_raw(item.title),
-                _rt_raw(item.repository or _TABLE_EMPTY_CELL),
                 _rt_raw(_TASK_STATUS_LABELS.get(item.status or "", _TABLE_EMPTY_CELL)),
                 _rt_link(item.thread_url, "Open") if item.thread_url else _rt_raw(_TABLE_EMPTY_CELL),
+                _rt_raw(item.repository or _TABLE_EMPTY_CELL),
                 _rt_link(item.pr_url, "View PR") if item.pr_url else _rt_raw(_TABLE_EMPTY_CELL),
+                _rt_raw(item.updated_at_label or _TABLE_EMPTY_CELL),
             ]
         )
     return {"type": "data_table", "caption": "Your tasks", "rows": rows}
@@ -720,7 +724,16 @@ def _rt_link(url: str, text: str) -> dict:
     }
 
 
-def _tasks_pagination_block(state: TasksState) -> dict:
+def _tasks_pagination_blocks(state: TasksState) -> list[dict]:
+    info = {
+        "type": "context",
+        "elements": [
+            {
+                "type": "mrkdwn",
+                "text": f"Page *{state.page + 1}* of *{state.total_pages}* · {state.total_filtered} tasks",
+            }
+        ],
+    }
     elements: list[dict[str, Any]] = []
     if state.has_prev:
         elements.append(
@@ -731,18 +744,6 @@ def _tasks_pagination_block(state: TasksState) -> dict:
                 "text": {"type": "plain_text", "text": "← Previous", "emoji": True},
             }
         )
-    elements.append(
-        {
-            "type": "button",
-            "action_id": ACTION_TASKS_REFRESH,
-            "value": str(state.page),
-            "text": {
-                "type": "plain_text",
-                "text": f"Page {state.page + 1} of {state.total_pages}",
-                "emoji": True,
-            },
-        }
-    )
     if state.has_next:
         elements.append(
             {
@@ -752,7 +753,9 @@ def _tasks_pagination_block(state: TasksState) -> dict:
                 "text": {"type": "plain_text", "text": "Next →", "emoji": True},
             }
         )
-    return {"type": "actions", "elements": elements}
+    if not elements:
+        return [info]
+    return [info, {"type": "actions", "elements": elements}]
 
 
 def _tasks_controls_block(state: TasksState) -> dict:
@@ -786,6 +789,15 @@ def _tasks_controls_block(state: TasksState) -> dict:
     if state.selected_status and any(o["value"] == state.selected_status for o in status_options):
         status_select["initial_option"] = next(o for o in status_options if o["value"] == state.selected_status)
     elements.append(status_select)
+
+    elements.append(
+        {
+            "type": "button",
+            "action_id": ACTION_TASKS_REFRESH,
+            "value": str(state.page),
+            "text": {"type": "plain_text", "text": "Refresh", "emoji": True},
+        }
+    )
 
     return {"type": "actions", "elements": elements}
 
@@ -1090,7 +1102,7 @@ def handle_ai_preferences_block_action(payload: dict, action: dict) -> HttpRespo
     ):
         selected_repo, selected_status = _read_tasks_filters_from_payload(payload)
         # Filter changes snap back to page 0; Refresh/Page carry the target
-        # page as the button value so the Home tab can stay stateless.
+        # page as the button value so the Home tab stays stateless.
         if action_id in (ACTION_TASKS_REFRESH, ACTION_TASKS_PAGE):
             try:
                 page = max(0, int(action.get("value") or "0"))
@@ -1383,8 +1395,8 @@ def _republish_home(
         logger.exception("slack_app_home_republish_failed")
 
 
-_TASKS_PAGE_SIZE = 10
-_TASKS_MAX_TOTAL = 100
+_TASKS_PAGE_SIZE = 5
+_TASKS_MAX_TOTAL = 200
 
 
 def _resolve_tasks_state(
@@ -1404,21 +1416,22 @@ def _resolve_tasks_state(
     """
 
     from django.conf import settings
+    from django.utils import timezone as django_timezone
 
     from products.slack_app.backend.models import SlackThreadTaskMapping
     from products.tasks.backend.facade import api as tasks_facade
     from products.tasks.backend.models import Task
 
     slack_team_id = integration.integration_id
-    # The mapping's `updated_at` advances whenever a thread reply is
-    # recorded, so "latest activity" sorts correctly for the user.
+    # `-updated_at` advances on each thread reply, so "latest activity"
+    # surfaces first. We don't expose a sort control today.
     mappings = list(
         SlackThreadTaskMapping.objects.filter(
             slack_workspace_id=slack_team_id,
             mentioning_slack_user_id=slack_user_id,
         )
         .order_by("-updated_at")
-        .values("task_id", "team_id", "channel", "thread_ts")[:_TASKS_MAX_TOTAL]
+        .values("task_id", "team_id", "channel", "thread_ts", "updated_at")[:_TASKS_MAX_TOTAL]
     )
     if not mappings:
         return TasksState()
@@ -1444,9 +1457,10 @@ def _resolve_tasks_state(
     runs_by_task = tasks_facade.get_latest_run_by_task([t.id for t in tasks])
     pr_urls_by_task = tasks_facade.get_latest_pr_url_by_task([t.id for t in tasks])
     tasks_by_id = {str(t.id): t for t in tasks}
-    thread_coords = {str(m["task_id"]): (m["channel"], m["thread_ts"]) for m in mappings}
+    mapping_by_task = {str(m["task_id"]): m for m in mappings}
 
     site_url = (settings.SITE_URL or "").rstrip("/")
+    now = django_timezone.now()
     all_items: list[TaskItem] = []
     repos_seen: list[str] = []
     seen_repo_set: set[str] = set()
@@ -1455,7 +1469,7 @@ def _resolve_tasks_state(
         if t is None:
             continue
         run = runs_by_task.get(str(t.id))
-        channel, thread_ts = thread_coords.get(str(t.id), ("", ""))
+        mapping = mapping_by_task.get(str(t.id), {})
         all_items.append(
             TaskItem(
                 title=t.title,
@@ -1463,7 +1477,8 @@ def _resolve_tasks_state(
                 status=run.status if run else None,
                 repository=t.repository,
                 pr_url=pr_urls_by_task.get(str(t.id)),
-                thread_url=_slack_thread_permalink(channel, thread_ts),
+                thread_url=_slack_thread_permalink(mapping.get("channel", ""), mapping.get("thread_ts", "")),
+                updated_at_label=_format_relative(mapping.get("updated_at"), now=now),
             )
         )
         if t.repository and t.repository not in seen_repo_set:
@@ -1507,12 +1522,33 @@ def _slack_thread_permalink(channel: str, thread_ts: str) -> str | None:
     return f"https://slack.com/archives/{channel}/p{thread_ts.replace('.', '')}"
 
 
+def _format_relative(when: datetime | None, *, now: datetime) -> str:
+    """Render a `datetime` as a compact relative label (`5m ago`, `Jun 20`).
+
+    `when` is None-tolerant so a missing mapping field never crashes the
+    Home tab; the column just shows an em-dash via the table's empty fallback.
+    """
+    if when is None:
+        return ""
+    delta = now - when
+    seconds = int(delta.total_seconds())
+    if seconds < 60:
+        return "just now"
+    if seconds < 3600:
+        return f"{seconds // 60}m ago"
+    if seconds < 86400:
+        return f"{seconds // 3600}h ago"
+    if seconds < 7 * 86400:
+        return f"{seconds // 86400}d ago"
+    return when.strftime("%b %d")
+
+
 def _read_tasks_filters_from_payload(payload: dict) -> tuple[str | None, str | None]:
     """Pull current filter selections off the Home tab view state.
 
-    The Home tab is stateless — each filter pick triggers a `block_actions`
-    payload that carries the *whole* view's input state, so the handler can
-    re-publish honouring whatever the user has dialled in.
+    The Home tab is stateless — each pick triggers a `block_actions` payload
+    that carries the *whole* view's input state, so the handler can re-publish
+    honouring whatever the user has dialled in.
     """
     values = (payload.get("view") or {}).get("state", {}).get("values", {}) or {}
     repo = (values.get(BLOCK_TASKS_FILTER_REPO, {}).get(ACTION_TASKS_FILTER_REPO, {}).get("selected_option") or {}).get(
