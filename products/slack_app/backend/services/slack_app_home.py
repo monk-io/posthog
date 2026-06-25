@@ -58,8 +58,11 @@ ACTION_TASKS_FILTER_STATUS = "slack_app_home:tasks_filter_status"
 ACTION_TASKS_REFRESH = "slack_app_home:tasks_refresh"
 ACTION_TASKS_PAGE = "slack_app_home:tasks_page"
 
-BLOCK_TASKS_FILTER_REPO = "block_tasks_filter_repo"
-BLOCK_TASKS_FILTER_STATUS = "block_tasks_filter_status"
+# Single block_id for the whole controls row. Block Kit only persists
+# state in `view.state.values` under blocks that carry a `block_id`, so
+# both the repo and the status dropdowns live under the same key here and
+# the handler can read them back on each pick.
+BLOCK_TASKS_CONTROLS = "block_tasks_controls"
 
 # Status keys the filter picker exposes — superset of `TaskRun.Status` values
 # we surface on the card. Kept here so the renderer and resolver stay in sync.
@@ -302,6 +305,7 @@ class TasksState:
     page: int = 0
     total_pages: int = 0
     total_filtered: int = 0
+    refreshed_at_epoch: int = 0  # Unix seconds; 0 hides the "Last refreshed" line
 
     @property
     def has_prev(self) -> bool:
@@ -661,6 +665,24 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
 
     if state.has_any_tasks:
         blocks.append(_tasks_controls_block(state))
+        if state.refreshed_at_epoch:
+            # Slack's mrkdwn date formatter auto-localises the time to the
+            # viewer; the fallback text is what non-Slack-rendered surfaces
+            # (search snippets, screen readers) see.
+            blocks.append(
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": (
+                                f"_Last refreshed <!date^{state.refreshed_at_epoch}"
+                                "^{date_short_pretty} at {time}|just now>_"
+                            ),
+                        }
+                    ],
+                }
+            )
 
     if not state.items:
         empty_text = (
@@ -799,7 +821,7 @@ def _tasks_controls_block(state: TasksState) -> dict:
         }
     )
 
-    return {"type": "actions", "elements": elements}
+    return {"type": "actions", "block_id": BLOCK_TASKS_CONTROLS, "elements": elements}
 
 
 def _row_summary(row: SlackSettings | None) -> str:
@@ -1395,7 +1417,7 @@ def _republish_home(
         logger.exception("slack_app_home_republish_failed")
 
 
-_TASKS_PAGE_SIZE = 5
+_TASKS_PAGE_SIZE = 15
 _TASKS_MAX_TOTAL = 200
 
 
@@ -1508,6 +1530,7 @@ def _resolve_tasks_state(
         page=safe_page,
         total_pages=total_pages,
         total_filtered=total_filtered,
+        refreshed_at_epoch=int(now.timestamp()),
     )
 
 
@@ -1548,15 +1571,14 @@ def _read_tasks_filters_from_payload(payload: dict) -> tuple[str | None, str | N
 
     The Home tab is stateless — each pick triggers a `block_actions` payload
     that carries the *whole* view's input state, so the handler can re-publish
-    honouring whatever the user has dialled in.
+    honouring whatever the user has dialled in. Block Kit only persists
+    state under blocks that carry a `block_id`, so the controls row uses
+    a single fixed `BLOCK_TASKS_CONTROLS` key for every select inside it.
     """
     values = (payload.get("view") or {}).get("state", {}).get("values", {}) or {}
-    repo = (values.get(BLOCK_TASKS_FILTER_REPO, {}).get(ACTION_TASKS_FILTER_REPO, {}).get("selected_option") or {}).get(
-        "value"
-    )
-    status = (
-        values.get(BLOCK_TASKS_FILTER_STATUS, {}).get(ACTION_TASKS_FILTER_STATUS, {}).get("selected_option") or {}
-    ).get("value")
+    controls = values.get(BLOCK_TASKS_CONTROLS, {})
+    repo = (controls.get(ACTION_TASKS_FILTER_REPO, {}).get("selected_option") or {}).get("value")
+    status = (controls.get(ACTION_TASKS_FILTER_STATUS, {}).get("selected_option") or {}).get("value")
     return repo, status
 
 
