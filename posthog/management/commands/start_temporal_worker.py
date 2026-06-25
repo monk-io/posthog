@@ -35,6 +35,10 @@ from posthog.temporal.alerts import (
     ACTIVITIES as ALERT_ACTIVITIES,
     WORKFLOWS as ALERT_WORKFLOWS,
 )
+from posthog.temporal.backfill_group_type_created_at import (
+    ACTIVITIES as BACKFILL_GROUP_TYPE_CREATED_AT_ACTIVITIES,
+    WORKFLOWS as BACKFILL_GROUP_TYPE_CREATED_AT_WORKFLOWS,
+)
 from posthog.temporal.cleanup_property_definitions import (
     ACTIVITIES as CLEANUP_PROPDEFS_ACTIVITIES,
     WORKFLOWS as CLEANUP_PROPDEFS_WORKFLOWS,
@@ -43,13 +47,6 @@ from posthog.temporal.common.health_server import HealthCheckServer
 from posthog.temporal.common.liveness_tracker import get_liveness_tracker
 from posthog.temporal.common.logger import configure_logger, get_logger
 from posthog.temporal.common.worker import ManagedWorker, create_worker
-from posthog.temporal.data_imports.settings import (
-    ACTIVITIES as DATA_SYNC_ACTIVITIES,
-    EMIT_SIGNALS_ACTIVITIES as DATA_IMPORT_EMIT_SIGNALS_ACTIVITIES,
-    EMIT_SIGNALS_WORKFLOWS as DATA_IMPORT_EMIT_SIGNALS_WORKFLOWS,
-    WORKFLOWS as DATA_SYNC_WORKFLOWS,
-)
-from posthog.temporal.data_imports.sources import load_all_sources
 from posthog.temporal.data_modeling import (
     ACTIVITIES as DATA_MODELING_ACTIVITIES,
     WORKFLOWS as DATA_MODELING_WORKFLOWS,
@@ -179,7 +176,11 @@ from products.business_knowledge.backend.temporal import (
     ACTIVITIES as BUSINESS_KNOWLEDGE_ACTIVITIES,
     WORKFLOWS as BUSINESS_KNOWLEDGE_WORKFLOWS,
 )
-from products.error_tracking.backend.temporal import (
+from products.conversations.backend.temporal import (
+    ACTIVITIES as CONVERSATIONS_ACTIVITIES,
+    WORKFLOWS as CONVERSATIONS_WORKFLOWS,
+)
+from products.error_tracking.backend.facade.temporal import (
     ACTIVITIES as ERROR_TRACKING_ACTIVITIES,
     WORKFLOWS as ERROR_TRACKING_WORKFLOWS,
 )
@@ -191,7 +192,7 @@ from products.exports.backend.temporal.subscriptions import (
     ACTIVITIES as SUBSCRIPTION_ACTIVITIES,
     WORKFLOWS as SUBSCRIPTION_WORKFLOWS,
 )
-from products.logs.backend.temporal import (
+from products.logs.backend.facade.temporal import (
     ACTIVITIES as LOGS_ALERTING_ACTIVITIES,
     WORKFLOWS as LOGS_ALERTING_WORKFLOWS,
 )
@@ -199,14 +200,23 @@ from products.replay_vision.backend.temporal import (
     ACTIVITIES as REPLAY_VISION_ACTIVITIES,
     WORKFLOWS as REPLAY_VISION_WORKFLOWS,
 )
+from products.signals.backend.emission.temporal_settings import (
+    EMIT_SIGNALS_ACTIVITIES as DATA_IMPORT_EMIT_SIGNALS_ACTIVITIES,
+    EMIT_SIGNALS_WORKFLOWS as DATA_IMPORT_EMIT_SIGNALS_WORKFLOWS,
+)
 from products.signals.backend.temporal import (
     ACTIVITIES as SIGNALS_PRODUCT_ACTIVITIES,
     WORKFLOWS as SIGNALS_PRODUCT_WORKFLOWS,
 )
-from products.tasks.backend.temporal import (
+from products.tasks.backend.facade.temporal import (
     ACTIVITIES as TASKS_ACTIVITIES,
     WORKFLOWS as TASKS_WORKFLOWS,
 )
+from products.warehouse_sources.backend.temporal.data_imports.settings import (
+    ACTIVITIES as DATA_SYNC_ACTIVITIES,
+    WORKFLOWS as DATA_SYNC_WORKFLOWS,
+)
+from products.warehouse_sources.backend.temporal.data_imports.sources import load_all_sources
 from products.web_analytics.backend.temporal import (
     ACTIVITIES as WA_DIGEST_ACTIVITIES,
     WORKFLOWS as WA_DIGEST_WORKFLOWS,
@@ -253,6 +263,7 @@ _task_queue_specs = [
         + EXPERIMENTS_WORKFLOWS
         + EXPERIMENTS_RECALCULATION_WORKFLOWS
         + CLEANUP_PROPDEFS_WORKFLOWS
+        + BACKFILL_GROUP_TYPE_CREATED_AT_WORKFLOWS
         + INGESTION_ACCEPTANCE_TEST_WORKFLOWS
         + WAREHOUSE_SOURCES_QUEUE_PARTITION_WORKFLOWS,
         PROXY_SERVICE_ACTIVITIES
@@ -267,6 +278,7 @@ _task_queue_specs = [
         + EXPERIMENTS_ACTIVITIES
         + EXPERIMENTS_RECALCULATION_ACTIVITIES
         + CLEANUP_PROPDEFS_ACTIVITIES
+        + BACKFILL_GROUP_TYPE_CREATED_AT_ACTIVITIES
         + INGESTION_ACCEPTANCE_TEST_ACTIVITIES
         + WAREHOUSE_SOURCES_QUEUE_PARTITION_ACTIVITIES,
     ),
@@ -312,8 +324,14 @@ _task_queue_specs = [
     ),
     (
         settings.VIDEO_EXPORT_TASK_QUEUE,
-        SIGNALS_PRODUCT_WORKFLOWS + DATA_IMPORT_EMIT_SIGNALS_WORKFLOWS + BUSINESS_KNOWLEDGE_WORKFLOWS,
-        SIGNALS_PRODUCT_ACTIVITIES + DATA_IMPORT_EMIT_SIGNALS_ACTIVITIES + BUSINESS_KNOWLEDGE_ACTIVITIES,
+        SIGNALS_PRODUCT_WORKFLOWS
+        + DATA_IMPORT_EMIT_SIGNALS_WORKFLOWS
+        + BUSINESS_KNOWLEDGE_WORKFLOWS
+        + CONVERSATIONS_WORKFLOWS,
+        SIGNALS_PRODUCT_ACTIVITIES
+        + DATA_IMPORT_EMIT_SIGNALS_ACTIVITIES
+        + BUSINESS_KNOWLEDGE_ACTIVITIES
+        + CONVERSATIONS_ACTIVITIES,
     ),
     (
         settings.SESSION_REPLAY_TASK_QUEUE,
@@ -327,7 +345,8 @@ _task_queue_specs = [
         + REPLAY_COUNT_METRICS_WORKFLOWS
         + SESSION_SUMMARY_WORKFLOWS
         + SESSION_SUMMARY_GROUP_WORKFLOWS
-        + SUMMARIZATION_SWEEP_WORKFLOWS,
+        + SUMMARIZATION_SWEEP_WORKFLOWS
+        + SURFACING_SCORING_SWEEP_WORKFLOWS,
         GEMINI_CLEANUP_SWEEP_ACTIVITIES
         + COUNT_PLAYLIST_ITEMS_ACTIVITIES
         + DELETE_RECORDINGS_ACTIVITIES
@@ -338,7 +357,8 @@ _task_queue_specs = [
         + REPLAY_COUNT_METRICS_ACTIVITIES
         + SESSION_SUMMARY_ACTIVITIES
         + SESSION_SUMMARY_GROUP_ACTIVITIES
-        + SUMMARIZATION_SWEEP_ACTIVITIES,
+        + SUMMARIZATION_SWEEP_ACTIVITIES
+        + SURFACING_SCORING_SWEEP_ACTIVITIES,
     ),
     (
         settings.REPLAY_VISION_TASK_QUEUE,
@@ -394,11 +414,6 @@ _task_queue_specs = [
         settings.LOGS_ALERTING_TASK_QUEUE,
         LOGS_ALERTING_WORKFLOWS,
         LOGS_ALERTING_ACTIVITIES,
-    ),
-    (
-        settings.SURFACING_SCORING_SWEEP_TASK_QUEUE,
-        SURFACING_SCORING_SWEEP_WORKFLOWS,
-        SURFACING_SCORING_SWEEP_ACTIVITIES,
     ),
 ]
 
@@ -580,12 +595,14 @@ class Command(BaseCommand):
 
         tag_queries(kind="temporal")
 
-        # Max AI traces span the Django request and the Temporal activity that runs the agent loop.
-        # Without the OTel plugin on the worker, every span emitted from an activity is a root span
-        # and the conversation trace splits across disconnected pieces. Force-enable for that queue
-        # so investigations don't depend on an operator flipping TEMPORAL_OTEL_PLUGIN_ENABLED.
+        # Max AI and tasks-agent traces span the Django request and the Temporal activity that runs
+        # the agent loop. Without the OTel plugin on the worker, every span emitted from an activity
+        # is a root span and the conversation trace splits across disconnected pieces. Force-enable
+        # for both queues so investigations don't depend on an operator flipping
+        # TEMPORAL_OTEL_PLUGIN_ENABLED.
         enable_otel = (
-            settings.TEMPORAL_OTEL_PLUGIN_ENABLED is True or task_queue == settings.MAX_AI_TASK_QUEUE
+            settings.TEMPORAL_OTEL_PLUGIN_ENABLED is True
+            or task_queue in (settings.MAX_AI_TASK_QUEUE, settings.TASKS_TASK_QUEUE)
         ) and settings.OTEL_SERVICE_NAME is not None
         if enable_otel is True:
             # Mypy doesn't understand we have already checked settings.OTEL_SERVICE_NAME

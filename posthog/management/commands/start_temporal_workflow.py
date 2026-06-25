@@ -9,7 +9,6 @@ from temporalio.common import RetryPolicy, WorkflowIDReusePolicy
 
 from posthog.temporal.ai import AI_WORKFLOWS
 from posthog.temporal.common.client import connect
-from posthog.temporal.data_imports.settings import WORKFLOWS as DATA_IMPORT_WORKFLOWS
 from posthog.temporal.delete_persons import WORKFLOWS as DELETE_PERSONS_WORKFLOWS
 from posthog.temporal.dlq_replay import WORKFLOWS as DLQ_REPLAY_WORKFLOWS
 from posthog.temporal.event_screenshots import WORKFLOWS as EVENT_SCREENSHOTS_WORKFLOWS
@@ -25,12 +24,14 @@ from posthog.temporal.session_replay.import_recording import IMPORT_RECORDING_WO
 from posthog.temporal.session_replay.rasterize_recording import RASTERIZE_RECORDING_WORKFLOWS
 from posthog.temporal.session_replay.replay_count_metrics import REPLAY_COUNT_METRICS_WORKFLOWS
 from posthog.temporal.session_replay.summarization_sweep import SUMMARIZATION_SWEEP_WORKFLOWS
+from posthog.temporal.session_replay.surfacing_scoring_sweep import SURFACING_SCORING_SWEEP_WORKFLOWS
 from posthog.temporal.sync_person_distinct_ids import WORKFLOWS as SYNC_PERSON_DISTINCT_IDS_WORKFLOWS
 from posthog.temporal.tests.utils.workflow import WORKFLOWS as TEST_WORKFLOWS
 from posthog.temporal.usage_report import WORKFLOWS as USAGE_REPORTS_WORKFLOWS
 from posthog.temporal.weekly_digest import WORKFLOWS as WEEKLY_DIGEST_WORKFLOWS
 
 from products.batch_exports.backend.temporal import WORKFLOWS as BATCH_EXPORT_WORKFLOWS
+from products.warehouse_sources.backend.temporal.data_imports.settings import WORKFLOWS as DATA_IMPORT_WORKFLOWS
 from products.web_analytics.backend.temporal import WORKFLOWS as WA_DIGEST_WORKFLOWS
 
 
@@ -158,6 +159,7 @@ class Command(BaseCommand):
             + EVENT_SCREENSHOTS_WORKFLOWS
             + HEALTH_CHECK_WORKFLOWS
             + WA_DIGEST_WORKFLOWS
+            + SURFACING_SCORING_SWEEP_WORKFLOWS
         )
         try:
             workflow = next(workflow for workflow in WORKFLOWS if workflow.is_named(workflow_name))
