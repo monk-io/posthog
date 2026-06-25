@@ -4,6 +4,7 @@ import express from 'ultimate-express'
 import { ModifiedRequest } from '~/api/router'
 import { PluginEvent } from '~/plugin-scaffold'
 
+import { buildIntegerMatcherWithPercentage } from '../config/config'
 import {
     HealthCheckResult,
     HealthCheckResultError,
@@ -11,6 +12,7 @@ import {
     PluginServerService,
     PluginsServerConfig,
 } from '../types'
+import { ValueMatcher } from '../types'
 import { logger } from '../utils/logger'
 import { UUID, UUIDT, delay } from '../utils/utils'
 import { getAsyncFunctionHandler, getRegisteredAsyncFunctionNames } from './async-function-registry'
@@ -105,6 +107,7 @@ export class CdpApi {
     private batchExportHogFunctionService: BatchExportHogFunctionService
     private groupsManager: GroupsManagerService
     private batchResolverProducer: CyclotronV2JobProducer | null
+    private batchResolverRoutingMatcher: ValueMatcher<number>
 
     constructor(
         private config: PluginsServerConfig,
@@ -154,6 +157,7 @@ export class CdpApi {
             this.invocationResultsService
         )
         this.batchResolverProducer = batchResolverProducer
+        this.batchResolverRoutingMatcher = buildIntegerMatcherWithPercentage(config.CDP_BATCH_RESOLVER_ROUTING)
     }
 
     public get service(): PluginServerService {
@@ -788,9 +792,9 @@ export class CdpApi {
                 maxAudienceSize,
             }
 
-            if (this.config.CDP_BATCH_RESOLVER_USE_CYCLOTRON) {
+            if (this.batchResolverRoutingMatcher(team.id)) {
                 if (!this.batchResolverProducer) {
-                    throw new Error('CDP_BATCH_RESOLVER_USE_CYCLOTRON is on but no producer is configured')
+                    throw new Error('CDP_BATCH_RESOLVER_ROUTING matched team but no producer is configured')
                 }
                 const initialState: BatchResolverState = {
                     batchJobId: parent_run_id,
