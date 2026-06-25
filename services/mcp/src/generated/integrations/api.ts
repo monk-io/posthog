@@ -21,6 +21,7 @@ export const IntegrationsListQueryParams = /* @__PURE__ */ zod.object({
         .enum([
             'anthropic',
             'apns',
+            'aws-s3',
             'azure-blob',
             'bing-ads',
             'clickup',
@@ -49,6 +50,7 @@ export const IntegrationsListQueryParams = /* @__PURE__ */ zod.object({
             'pinterest-ads',
             'postgresql',
             'reddit-ads',
+            's3-compatible',
             'salesforce',
             'slack',
             'slack-posthog-code',

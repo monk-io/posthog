@@ -6,6 +6,7 @@
             "enum": [
                 "anthropic",
                 "apns",
+                "aws-s3",
                 "azure-blob",
                 "bing-ads",
                 "clickup",
@@ -34,6 +35,7 @@
                 "pinterest-ads",
                 "postgresql",
                 "reddit-ads",
+                "s3-compatible",
                 "salesforce",
                 "slack",
                 "slack-posthog-code",
