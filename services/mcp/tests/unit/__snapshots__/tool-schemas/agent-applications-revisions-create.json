@@ -23,6 +23,10 @@
         },
         "spec": {
             "properties": {
+                "authoritative_provider": {
+                    "minLength": 1,
+                    "type": "string"
+                },
                 "entrypoint": {
                     "default": "agent.md",
                     "type": "string"
