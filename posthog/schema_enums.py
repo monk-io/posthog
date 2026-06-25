@@ -2289,6 +2289,11 @@ class LogsSparklineBreakdownBy(StrEnum):
     SERVICE = "service"
 
 
+class Direction(StrEnum):
+    BEFORE = "before"
+    AFTER = "after"
+
+
 class MarketingAnalyticsBaseColumns(StrEnum):
     ID = "ID"
     CAMPAIGN = "Campaign"
@@ -2562,6 +2567,8 @@ class NodeKind(StrEnum):
     MCP_TOOL_STATS_QUERY = "MCPToolStatsQuery"
     MCP_TOOL_DAILY_STATS_QUERY = "MCPToolDailyStatsQuery"
     MCP_TOOL_DESCRIPTIONS_QUERY = "MCPToolDescriptionsQuery"
+    MCP_TOOL_SAMPLE_INTENTS_QUERY = "MCPToolSampleIntentsQuery"
+    MCP_TOOL_NEIGHBORS_QUERY = "MCPToolNeighborsQuery"
     PROPERTY_VALUES_QUERY = "PropertyValuesQuery"
 
 
