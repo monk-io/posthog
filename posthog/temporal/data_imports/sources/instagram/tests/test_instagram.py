@@ -5,9 +5,9 @@ from typing import Any, cast
 import pytest
 from unittest import mock
 
-from posthog.temporal.data_imports.sources.generated_configs import InstagramSourceConfig
-from posthog.temporal.data_imports.sources.instagram import instagram as ig
-from posthog.temporal.data_imports.sources.instagram.instagram import (
+from products.warehouse_sources.backend.temporal.data_imports.sources.generated_configs import InstagramSourceConfig
+from products.warehouse_sources.backend.temporal.data_imports.sources.instagram import instagram as ig
+from products.warehouse_sources.backend.temporal.data_imports.sources.instagram.instagram import (
     INSIGHTS_LOOKBACK_DAYS,
     INSTAGRAM_AUTH_ERROR_MESSAGE,
     InstagramResumeConfig,

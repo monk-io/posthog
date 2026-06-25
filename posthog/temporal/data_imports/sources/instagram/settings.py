@@ -1,8 +1,11 @@
 from typing import TypedDict
 
-from posthog.temporal.data_imports.pipelines.pipeline.typings import PartitionFormat, PartitionMode, SortMode
-
-from products.data_warehouse.backend.types import IncrementalField, IncrementalFieldType
+from products.warehouse_sources.backend.temporal.data_imports.pipelines.pipeline.typings import (
+    PartitionFormat,
+    PartitionMode,
+    SortMode,
+)
+from products.warehouse_sources.backend.types import IncrementalField, IncrementalFieldType
 
 
 class InstagramEndpointConfig(TypedDict):

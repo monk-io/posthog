@@ -3,12 +3,11 @@ from unittest import mock
 
 from posthog.schema import ReleaseStatus, SourceFieldOauthConfig
 
-from posthog.temporal.data_imports.sources.generated_configs import InstagramSourceConfig
-from posthog.temporal.data_imports.sources.instagram.instagram import InstagramResumeConfig
-from posthog.temporal.data_imports.sources.instagram.settings import INSTAGRAM_ENDPOINTS
-from posthog.temporal.data_imports.sources.instagram.source import InstagramSource
-
-from products.data_warehouse.backend.types import ExternalDataSourceType, IncrementalFieldType
+from products.warehouse_sources.backend.temporal.data_imports.sources.generated_configs import InstagramSourceConfig
+from products.warehouse_sources.backend.temporal.data_imports.sources.instagram.instagram import InstagramResumeConfig
+from products.warehouse_sources.backend.temporal.data_imports.sources.instagram.settings import INSTAGRAM_ENDPOINTS
+from products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source import InstagramSource
+from products.warehouse_sources.backend.types import ExternalDataSourceType, IncrementalFieldType
 
 
 def _config() -> InstagramSourceConfig:
@@ -97,7 +96,9 @@ def test_source_for_pipeline_plumbs_arguments():
     inputs.db_incremental_field_last_value = "2026-04-01"
     manager = mock.MagicMock()
 
-    with mock.patch("posthog.temporal.data_imports.sources.instagram.source.instagram_source") as mock_source:
+    with mock.patch(
+        "products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source.instagram_source"
+    ) as mock_source:
         InstagramSource().source_for_pipeline(_config(), manager, inputs)
 
     mock_source.assert_called_once_with(
@@ -117,7 +118,9 @@ def test_source_for_pipeline_forwards_last_value_when_not_incremental():
     inputs.should_use_incremental_field = False
     inputs.db_incremental_field_last_value = "2026-04-01"
 
-    with mock.patch("posthog.temporal.data_imports.sources.instagram.source.instagram_source") as mock_source:
+    with mock.patch(
+        "products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source.instagram_source"
+    ) as mock_source:
         InstagramSource().source_for_pipeline(_config(), mock.MagicMock(), inputs)
 
     # `instagram_source` applies the `should_use_incremental_field` guard itself, so the
@@ -128,7 +131,7 @@ def test_source_for_pipeline_forwards_last_value_when_not_incremental():
 
 def test_validate_credentials_handles_token_failure():
     with mock.patch(
-        "posthog.temporal.data_imports.sources.instagram.source.get_access_token",
+        "products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source.get_access_token",
         side_effect=Exception("Failed to refresh token"),
     ):
         ok, message = InstagramSource().validate_credentials(_config(), team_id=1)
@@ -139,9 +142,12 @@ def test_validate_credentials_handles_token_failure():
 
 def test_validate_credentials_handles_account_listing_failure():
     with (
-        mock.patch("posthog.temporal.data_imports.sources.instagram.source.get_access_token", return_value="token"),
         mock.patch(
-            "posthog.temporal.data_imports.sources.instagram.source.discover_instagram_accounts",
+            "products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source.get_access_token",
+            return_value="token",
+        ),
+        mock.patch(
+            "products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source.discover_instagram_accounts",
             side_effect=Exception("boom"),
         ),
     ):
@@ -153,9 +159,12 @@ def test_validate_credentials_handles_account_listing_failure():
 
 def test_validate_credentials_rejects_when_no_linked_accounts():
     with (
-        mock.patch("posthog.temporal.data_imports.sources.instagram.source.get_access_token", return_value="token"),
         mock.patch(
-            "posthog.temporal.data_imports.sources.instagram.source.discover_instagram_accounts",
+            "products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source.get_access_token",
+            return_value="token",
+        ),
+        mock.patch(
+            "products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source.discover_instagram_accounts",
             return_value=[],
         ),
     ):
@@ -167,9 +176,12 @@ def test_validate_credentials_rejects_when_no_linked_accounts():
 
 def test_validate_credentials_succeeds_with_linked_account():
     with (
-        mock.patch("posthog.temporal.data_imports.sources.instagram.source.get_access_token", return_value="token"),
         mock.patch(
-            "posthog.temporal.data_imports.sources.instagram.source.discover_instagram_accounts",
+            "products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source.get_access_token",
+            return_value="token",
+        ),
+        mock.patch(
+            "products.warehouse_sources.backend.temporal.data_imports.sources.instagram.source.discover_instagram_accounts",
             return_value=[{"id": "1", "username": "posthog", "page_name": "PostHog"}],
         ),
     ):

@@ -10,12 +10,13 @@ import structlog
 from requests import Response
 
 from posthog.models.integration import ERROR_TOKEN_REFRESH_FAILED, InstagramIntegration, Integration
-from posthog.temporal.data_imports.naming_convention import NamingConvention
-from posthog.temporal.data_imports.pipelines.pipeline.typings import SourceResponse
-from posthog.temporal.data_imports.sources.common.http import make_tracked_session
-from posthog.temporal.data_imports.sources.common.resumable import ResumableSourceManager
-from posthog.temporal.data_imports.sources.generated_configs import InstagramSourceConfig
-from posthog.temporal.data_imports.sources.instagram.settings import (
+
+from products.warehouse_sources.backend.temporal.data_imports.naming_convention import NamingConvention
+from products.warehouse_sources.backend.temporal.data_imports.pipelines.pipeline.typings import SourceResponse
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.http import make_tracked_session
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.resumable import ResumableSourceManager
+from products.warehouse_sources.backend.temporal.data_imports.sources.generated_configs import InstagramSourceConfig
+from products.warehouse_sources.backend.temporal.data_imports.sources.instagram.settings import (
     INSTAGRAM_ENDPOINTS,
     MEDIA_FIELDS,
     STORY_FIELDS,

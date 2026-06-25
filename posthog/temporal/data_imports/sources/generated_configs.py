@@ -3,10 +3,9 @@
 
 from typing import Literal
 
-from posthog.temporal.data_imports.sources.common import config
-
-from products.data_warehouse.backend.types import ExternalDataSourceType
 from products.warehouse_sources.backend.models.ssh_tunnel import SSHTunnelConfig
+from products.warehouse_sources.backend.temporal.data_imports.sources.common import config
+from products.warehouse_sources.backend.types import ExternalDataSourceType
 
 
 @config.config

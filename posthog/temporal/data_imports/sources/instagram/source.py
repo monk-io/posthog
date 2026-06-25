@@ -8,14 +8,17 @@ from posthog.schema import (
     SourceFieldOauthConfig,
 )
 
-from posthog.temporal.data_imports.pipelines.pipeline.typings import SourceInputs, SourceResponse
-from posthog.temporal.data_imports.sources.common.base import FieldType, ResumableSource
-from posthog.temporal.data_imports.sources.common.mixins import OAuthMixin
-from posthog.temporal.data_imports.sources.common.registry import SourceRegistry
-from posthog.temporal.data_imports.sources.common.resumable import ResumableSourceManager
-from posthog.temporal.data_imports.sources.common.schema import SourceSchema
-from posthog.temporal.data_imports.sources.generated_configs import InstagramSourceConfig
-from posthog.temporal.data_imports.sources.instagram.instagram import (
+from products.warehouse_sources.backend.temporal.data_imports.pipelines.pipeline.typings import (
+    SourceInputs,
+    SourceResponse,
+)
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.base import FieldType, ResumableSource
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.mixins import OAuthMixin
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.registry import SourceRegistry
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.resumable import ResumableSourceManager
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.schema import SourceSchema
+from products.warehouse_sources.backend.temporal.data_imports.sources.generated_configs import InstagramSourceConfig
+from products.warehouse_sources.backend.temporal.data_imports.sources.instagram.instagram import (
     INSTAGRAM_AUTH_ERROR_MESSAGE,
     INSTAGRAM_TOKEN_REFRESH_ERROR_MESSAGE,
     InstagramResumeConfig,
@@ -23,9 +26,8 @@ from posthog.temporal.data_imports.sources.instagram.instagram import (
     get_access_token,
     instagram_source,
 )
-from posthog.temporal.data_imports.sources.instagram.settings import INSTAGRAM_ENDPOINTS
-
-from products.data_warehouse.backend.types import ExternalDataSourceType
+from products.warehouse_sources.backend.temporal.data_imports.sources.instagram.settings import INSTAGRAM_ENDPOINTS
+from products.warehouse_sources.backend.types import ExternalDataSourceType
 
 
 @SourceRegistry.register
