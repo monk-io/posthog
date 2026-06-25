@@ -774,38 +774,65 @@ export const IdentityProviderConfigSchema = z.discriminatedUnion('kind', [
 ])
 export type IdentityProviderConfig = z.infer<typeof IdentityProviderConfigSchema>
 
-export const AgentSpecSchema = z.object({
-    model: ModelIdSchema,
-    triggers: z.array(TriggerSchema).default([]),
-    tools: z.array(ToolRefSchema).default([]),
-    mcps: z.array(McpRefSchema).default([]),
-    skills: z.array(SkillRefSchema).default([]),
-    /** Identity providers users can link against (the credential axis). */
-    identity_providers: z.array(IdentityProviderConfigSchema).default([]),
-    /**
-     * The ONE provider that gates admission and is the source-of-truth identity.
-     * Must reference an `identity_providers[]` entry that establishes identity.
-     * When set, every inbound request (regardless of transport) must resolve a
-     * verified identity from this provider before a session runs — the ingress
-     * either finds a durable transport→identity binding, verifies a per-request
-     * credential, or returns an auth block. When unset, the transport claim is
-     * the identity (passthrough / public agents). All OTHER identity_providers
-     * link as secondary credentials to the authoritative (canonical) identity.
-     */
-    authoritative_provider: z.string().min(1).optional(),
-    secrets: z.array(SecretRefSchema).default([]),
-    limits: SpecLimitsSchema.default({
-        max_turns: 50,
-        max_tool_calls: 200,
-        max_wall_seconds: 15 * 60,
-        max_memory_mb: 512,
-        max_cpu_cores: 0.25,
-    }),
-    entrypoint: z.string().default('agent.md'),
-    reasoning: ReasoningEffortSchema.optional(),
-    framework_prompt: FrameworkPromptConfigSchema.optional(),
-    resume: ResumeConfigSchema.optional(),
-})
+export const AgentSpecSchema = z
+    .object({
+        model: ModelIdSchema,
+        triggers: z.array(TriggerSchema).default([]),
+        tools: z.array(ToolRefSchema).default([]),
+        mcps: z.array(McpRefSchema).default([]),
+        skills: z.array(SkillRefSchema).default([]),
+        /** Identity providers users can link against (the credential axis). */
+        identity_providers: z.array(IdentityProviderConfigSchema).default([]),
+        /**
+         * The ONE provider that gates admission and is the source-of-truth identity.
+         * Must reference an `identity_providers[]` entry that establishes identity.
+         * When set, every inbound request (regardless of transport) must resolve a
+         * verified identity from this provider before a session runs — the ingress
+         * either finds a durable transport→identity binding, verifies a per-request
+         * credential, or returns an auth block. When unset, the transport claim is
+         * the identity (passthrough / public agents). All OTHER identity_providers
+         * link as secondary credentials to the authoritative (canonical) identity.
+         */
+        authoritative_provider: z.string().min(1).optional(),
+        secrets: z.array(SecretRefSchema).default([]),
+        limits: SpecLimitsSchema.default({
+            max_turns: 50,
+            max_tool_calls: 200,
+            max_wall_seconds: 15 * 60,
+            max_memory_mb: 512,
+            max_cpu_cores: 0.25,
+        }),
+        entrypoint: z.string().default('agent.md'),
+        reasoning: ReasoningEffortSchema.optional(),
+        framework_prompt: FrameworkPromptConfigSchema.optional(),
+        resume: ResumeConfigSchema.optional(),
+    })
+    .superRefine((spec, ctx) => {
+        // authoritative_provider must reference an identity_providers[] entry that can
+        // prove a subject (posthog, or oauth2 with userinfo_url) — else admission
+        // either 500s (unknown) or soft-locks (no subject) at runtime.
+        if (!spec.authoritative_provider) {
+            return
+        }
+        const provider = spec.identity_providers.find((p) => p.id === spec.authoritative_provider)
+        if (!provider) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['authoritative_provider'],
+                message: `authoritative_provider "${spec.authoritative_provider}" must reference an identity_providers[] id`,
+            })
+            return
+        }
+        const establishesIdentity =
+            provider.kind === 'posthog' || (provider.kind === 'oauth2' && !!provider.userinfo_url)
+        if (!establishesIdentity) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['authoritative_provider'],
+                message: `authoritative_provider "${spec.authoritative_provider}" must establish identity (kind posthog, or oauth2 with userinfo_url)`,
+            })
+        }
+    })
 
 export type AgentSpec = z.infer<typeof AgentSpecSchema>
 export type Trigger = z.infer<typeof TriggerSchema>
