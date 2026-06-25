@@ -142,12 +142,17 @@ function SandboxRunViewerContent({
     )
 
     if (!isLive) {
-        return <div className={cn('flex flex-col h-full min-h-0 w-full', className)}>{thread}</div>
+        return (
+            // The virtualized thread owns scroll and renders rows edge-to-edge; the padding here insets the
+            // scroll area so transcript content isn't glued to the embedding box's border. Overridable via
+            // `className` (tailwind-merge), e.g. an embedder that supplies its own padding.
+            <div className={cn('flex flex-col h-full min-h-0 w-full px-3 py-2', className)}>{thread}</div>
+        )
     }
 
     return (
-        <div className={cn('@container/thread flex flex-col h-full overflow-hidden', className)}>
-            <div className="flex-1 min-h-0">{thread}</div>
+        <div className={cn('@container/thread flex flex-col h-full min-h-0 w-full overflow-hidden', className)}>
+            <div className="flex-1 min-h-0 px-3 py-2">{thread}</div>
 
             <SandboxResourcesBar />
 

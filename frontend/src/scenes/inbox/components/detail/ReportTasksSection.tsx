@@ -84,12 +84,13 @@ function TaskRow({
             {expanded ? (
                 <div className="mt-1.5 mb-1 ml-1.5">
                     {runId ? (
-                        <div className="h-[420px] overflow-y-auto rounded border border-primary bg-surface-primary">
+                        // The viewer's virtualized thread owns scroll, so the box just bounds the height
+                        // and clips — an outer `overflow-auto` here would nest a second scrollbar.
+                        <div className="h-[420px] overflow-hidden rounded border border-primary bg-surface-primary">
                             <SandboxRunViewer
                                 taskId={task.id}
                                 runId={runId}
                                 interaction={replayOnly ? 'read-only' : 'live'}
-                                className="px-3 py-2"
                             />
                         </div>
                     ) : (
