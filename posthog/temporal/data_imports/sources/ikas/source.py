@@ -6,11 +6,10 @@ from posthog.schema import (
     SourceConfig,
 )
 
-from posthog.temporal.data_imports.sources.common.base import FieldType, SimpleSource
-from posthog.temporal.data_imports.sources.common.registry import SourceRegistry
-from posthog.temporal.data_imports.sources.generated_configs import IkasSourceConfig
-
-from products.data_warehouse.backend.types import ExternalDataSourceType
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.base import FieldType, SimpleSource
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.registry import SourceRegistry
+from products.warehouse_sources.backend.temporal.data_imports.sources.generated_configs import IkasSourceConfig
+from products.warehouse_sources.backend.types import ExternalDataSourceType
 
 
 @SourceRegistry.register
