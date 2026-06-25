@@ -479,6 +479,7 @@ doesn't conflict with concurrent PRs.
 - kyve
 - leadfeeder
 - leexi
+- lemon_squeezy
 - less_annoying_crm
 - lever
 - liana
