@@ -9,20 +9,19 @@ from temporalio.common import MetricMeter
 from temporalio.runtime import MetricBuffer, Runtime, TelemetryConfig
 from temporalio.testing import ActivityEnvironment
 
-from posthog.temporal.data_imports.cdc import metrics
-from posthog.temporal.data_imports.cdc.activities import (
+from products.warehouse_sources.backend.models.external_data_source import ExternalDataSource
+from products.warehouse_sources.backend.temporal.data_imports.cdc import metrics
+from products.warehouse_sources.backend.temporal.data_imports.cdc.activities import (
     CDCExtractActivity,
     CDCExtractInput,
     cdc_extract_activity,
     cleanup_orphan_slots_activity,
 )
-from posthog.temporal.data_imports.cdc.batcher import ChangeEventBatcher
-from posthog.temporal.data_imports.cdc.types import ChangeEvent
-from posthog.temporal.data_imports.sources.postgres.cdc.config import PostgresCDCConfig
+from products.warehouse_sources.backend.temporal.data_imports.cdc.batcher import ChangeEventBatcher
+from products.warehouse_sources.backend.temporal.data_imports.cdc.types import ChangeEvent
+from products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.config import PostgresCDCConfig
 
-from products.warehouse_sources.backend.models.external_data_source import ExternalDataSource
-
-_ACTIVITIES = "posthog.temporal.data_imports.cdc.activities"
+_ACTIVITIES = "products.warehouse_sources.backend.temporal.data_imports.cdc.activities"
 
 
 class TestMetricsOutsideActivityContext:

@@ -30,9 +30,9 @@ from dataclasses import (
 from datetime import UTC, datetime
 from typing import Any
 
-from posthog.temporal.data_imports.cdc.errors import CDCTransactionTooLargeError
-from posthog.temporal.data_imports.cdc.types import ChangeEvent
-from posthog.temporal.data_imports.sources.postgres.cdc.position import PgLSN
+from products.warehouse_sources.backend.temporal.data_imports.cdc.errors import CDCTransactionTooLargeError
+from products.warehouse_sources.backend.temporal.data_imports.cdc.types import ChangeEvent
+from products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.position import PgLSN
 
 logger = logging.getLogger(__name__)
 

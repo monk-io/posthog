@@ -5,8 +5,8 @@ import pytest
 
 from parameterized import parameterized
 
-from posthog.temporal.data_imports.cdc.errors import CDCTransactionTooLargeError
-from posthog.temporal.data_imports.sources.postgres.cdc.decoder import (
+from products.warehouse_sources.backend.temporal.data_imports.cdc.errors import CDCTransactionTooLargeError
+from products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.decoder import (
     _OID_BOOL,
     _OID_FLOAT8,
     _OID_INT4,
@@ -18,7 +18,7 @@ from posthog.temporal.data_imports.sources.postgres.cdc.decoder import (
     _pg_timestamp_to_datetime,
 )
 
-_DECODER_MODULE = "posthog.temporal.data_imports.sources.postgres.cdc.decoder"
+_DECODER_MODULE = "products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.decoder"
 
 
 def _make_cstring(s: str) -> bytes:

@@ -4,7 +4,10 @@ from unittest.mock import patch
 
 import psycopg
 
-from posthog.temporal.data_imports.sources.postgres.cdc.stream_reader import PgCDCConnectionParams, PgCDCStreamReader
+from products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.stream_reader import (
+    PgCDCConnectionParams,
+    PgCDCStreamReader,
+)
 
 
 @pytest.fixture
@@ -39,7 +42,7 @@ class TestPgCDCStreamReaderSSL:
         connect = mock.MagicMock(return_value=mock.MagicMock())
         reader = PgCDCStreamReader(_params(require_ssl))
         with patch(
-            "posthog.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
+            "products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
             connect,
         ):
             reader.connect()
@@ -51,7 +54,7 @@ class TestPgCDCStreamReaderSSL:
         connect = mock.MagicMock(return_value=mock.MagicMock())
         reader = PgCDCStreamReader(_params(require_ssl))
         with patch(
-            "posthog.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
+            "products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
             connect,
         ):
             reader.confirm_position("0/1234ABCD")
@@ -74,10 +77,10 @@ class TestPgCDCStreamReaderConnect:
         reader = PgCDCStreamReader(params)
         with (
             patch(
-                "posthog.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
+                "products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
                 connect,
             ),
-            patch("posthog.temporal.data_imports.sources.postgres.postgres.time.sleep"),
+            patch("products.warehouse_sources.backend.temporal.data_imports.sources.postgres.postgres.time.sleep"),
         ):
             reader.connect()
 
@@ -94,10 +97,10 @@ class TestPgCDCStreamReaderConnect:
         reader = PgCDCStreamReader(params)
         with (
             patch(
-                "posthog.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
+                "products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
                 connect,
             ),
-            patch("posthog.temporal.data_imports.sources.postgres.postgres.time.sleep"),
+            patch("products.warehouse_sources.backend.temporal.data_imports.sources.postgres.postgres.time.sleep"),
         ):
             with pytest.raises(psycopg.OperationalError):
                 reader.connect()
@@ -110,7 +113,7 @@ class TestPgCDCStreamReaderConnectOptions:
         connect = mock.MagicMock(return_value=mock.MagicMock())
         reader = PgCDCStreamReader(params)
         with patch(
-            "posthog.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
+            "products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
             connect,
         ):
             reader.connect()
@@ -175,10 +178,10 @@ class TestPgCDCStreamReaderConfirmPosition:
         reader = PgCDCStreamReader(params)
         with (
             patch(
-                "posthog.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
+                "products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
                 connect,
             ),
-            patch("posthog.temporal.data_imports.sources.postgres.postgres.time.sleep"),
+            patch("products.warehouse_sources.backend.temporal.data_imports.sources.postgres.postgres.time.sleep"),
         ):
             reader.confirm_position("0/1234ABCD")
 
@@ -196,10 +199,10 @@ class TestPgCDCStreamReaderConfirmPosition:
         reader = PgCDCStreamReader(params)
         with (
             patch(
-                "posthog.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
+                "products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.stream_reader._connect_to_postgres",
                 connect,
             ),
-            patch("posthog.temporal.data_imports.sources.postgres.postgres.time.sleep"),
+            patch("products.warehouse_sources.backend.temporal.data_imports.sources.postgres.postgres.time.sleep"),
         ):
             with pytest.raises(psycopg.OperationalError):
                 reader.confirm_position("0/1234ABCD")

@@ -16,9 +16,9 @@ import psycopg
 import structlog
 from psycopg import sql
 
-from posthog.temporal.data_imports.cdc.types import ChangeEvent
-from posthog.temporal.data_imports.sources.postgres.cdc.decoder import PgOutputDecoder
-from posthog.temporal.data_imports.sources.postgres.postgres import (
+from products.warehouse_sources.backend.temporal.data_imports.cdc.types import ChangeEvent
+from products.warehouse_sources.backend.temporal.data_imports.sources.postgres.cdc.decoder import PgOutputDecoder
+from products.warehouse_sources.backend.temporal.data_imports.sources.postgres.postgres import (
     _connect_to_postgres,
     _connect_with_dropped_retry,
     get_primary_key_columns,
@@ -70,7 +70,7 @@ class PgCDCStreamReader:
         # The tunnel must stay open for the lifetime of the reader so confirm_position
         # connections can also reach the source DB.
         if self._source is not None:
-            from posthog.temporal.data_imports.sources.postgres.source import PostgresSource
+            from products.warehouse_sources.backend.temporal.data_imports.sources.postgres.source import PostgresSource
 
             source_impl = PostgresSource()
             config = source_impl.parse_config(self._source.job_inputs or {})
