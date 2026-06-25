@@ -5724,6 +5724,38 @@ class MCPHarnessBreakdownItem(BaseModel):
     total_calls: int
 
 
+class MCPToolFailureItem(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    harnesses: list[str] = Field(
+        ...,
+        description=("Resolved harness labels seen for this exception, deduped and sorted."),
+    )
+    last_seen: str
+    message: str
+    occurrences: int
+
+
+class MCPToolTopUserItem(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    calls: int
+    distinct_id: str
+    error_rate_pct: float
+    errors: int
+    harnesses: list[str] = Field(
+        ...,
+        description="Resolved harness labels seen for this user, deduped and sorted.",
+    )
+    last_seen: str
+    person_properties: str = Field(
+        ...,
+        description=("JSON-encoded person.properties for the most recent call, for display."),
+    )
+
+
 class MarketingAnalyticsItem(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -10832,6 +10864,110 @@ class CachedMCPHarnessBreakdownQueryResponse(BaseModel):
         default=None, description="The date range used for the query"
     )
     results: list[MCPHarnessBreakdownItem]
+    timezone: str
+    timings: list[QueryTiming] | None = Field(
+        default=None,
+        description=("Measured timings for different parts of the query generation process"),
+    )
+    warnings: list[DataWarehouseSyncWarning] | None = Field(
+        default=None,
+        description=(
+            "Warnings about data warehouse sources referenced by the query whose latest"
+            " sync failed, is paused, hit a billing limit, or is otherwise stale."
+            " Results may not reflect current source data. Accumulated across every"
+            " HogQL execution that contributes to this response — so insights backed by"
+            " warehouse tables (Trends, Funnels, etc.) receive the same warnings as raw"
+            " HogQL queries."
+        ),
+    )
+
+
+class CachedMCPToolFailuresQueryResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    cache_key: str
+    cache_target_age: AwareDatetime | None = None
+    calculation_trigger: str | None = Field(
+        default=None,
+        description=("What triggered the calculation of the query, leave empty if user/immediate"),
+    )
+    error: str | None = Field(
+        default=None,
+        description=(
+            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
+        ),
+    )
+    hogql: str | None = Field(default=None, description="Generated HogQL query.")
+    is_cached: bool
+    last_refresh: AwareDatetime
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    next_allowed_client_refresh: AwareDatetime
+    query_metadata: dict[str, Any] | None = None
+    query_status: QueryStatus | None = Field(
+        default=None,
+        description=("Query status indicates whether next to the provided data, a query is still running."),
+    )
+    resolved_compare_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None,
+        description=("The resolved previous/comparison period date range, when comparing against another period"),
+    )
+    resolved_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None, description="The date range used for the query"
+    )
+    results: list[MCPToolFailureItem]
+    timezone: str
+    timings: list[QueryTiming] | None = Field(
+        default=None,
+        description=("Measured timings for different parts of the query generation process"),
+    )
+    warnings: list[DataWarehouseSyncWarning] | None = Field(
+        default=None,
+        description=(
+            "Warnings about data warehouse sources referenced by the query whose latest"
+            " sync failed, is paused, hit a billing limit, or is otherwise stale."
+            " Results may not reflect current source data. Accumulated across every"
+            " HogQL execution that contributes to this response — so insights backed by"
+            " warehouse tables (Trends, Funnels, etc.) receive the same warnings as raw"
+            " HogQL queries."
+        ),
+    )
+
+
+class CachedMCPToolTopUsersQueryResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    cache_key: str
+    cache_target_age: AwareDatetime | None = None
+    calculation_trigger: str | None = Field(
+        default=None,
+        description=("What triggered the calculation of the query, leave empty if user/immediate"),
+    )
+    error: str | None = Field(
+        default=None,
+        description=(
+            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
+        ),
+    )
+    hogql: str | None = Field(default=None, description="Generated HogQL query.")
+    is_cached: bool
+    last_refresh: AwareDatetime
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    next_allowed_client_refresh: AwareDatetime
+    query_metadata: dict[str, Any] | None = None
+    query_status: QueryStatus | None = Field(
+        default=None,
+        description=("Query status indicates whether next to the provided data, a query is still running."),
+    )
+    resolved_compare_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None,
+        description=("The resolved previous/comparison period date range, when comparing against another period"),
+    )
+    resolved_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None, description="The date range used for the query"
+    )
+    results: list[MCPToolTopUserItem]
     timezone: str
     timings: list[QueryTiming] | None = Field(
         default=None,
@@ -16323,6 +16459,88 @@ class MCPHarnessBreakdownQueryResponse(BaseModel):
     )
 
 
+class MCPToolFailuresQueryResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: str | None = Field(
+        default=None,
+        description=(
+            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
+        ),
+    )
+    hogql: str | None = Field(default=None, description="Generated HogQL query.")
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    query_status: QueryStatus | None = Field(
+        default=None,
+        description=("Query status indicates whether next to the provided data, a query is still running."),
+    )
+    resolved_compare_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None,
+        description=("The resolved previous/comparison period date range, when comparing against another period"),
+    )
+    resolved_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None, description="The date range used for the query"
+    )
+    results: list[MCPToolFailureItem]
+    timings: list[QueryTiming] | None = Field(
+        default=None,
+        description=("Measured timings for different parts of the query generation process"),
+    )
+    warnings: list[DataWarehouseSyncWarning] | None = Field(
+        default=None,
+        description=(
+            "Warnings about data warehouse sources referenced by the query whose latest"
+            " sync failed, is paused, hit a billing limit, or is otherwise stale."
+            " Results may not reflect current source data. Accumulated across every"
+            " HogQL execution that contributes to this response — so insights backed by"
+            " warehouse tables (Trends, Funnels, etc.) receive the same warnings as raw"
+            " HogQL queries."
+        ),
+    )
+
+
+class MCPToolTopUsersQueryResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: str | None = Field(
+        default=None,
+        description=(
+            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
+        ),
+    )
+    hogql: str | None = Field(default=None, description="Generated HogQL query.")
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    query_status: QueryStatus | None = Field(
+        default=None,
+        description=("Query status indicates whether next to the provided data, a query is still running."),
+    )
+    resolved_compare_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None,
+        description=("The resolved previous/comparison period date range, when comparing against another period"),
+    )
+    resolved_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None, description="The date range used for the query"
+    )
+    results: list[MCPToolTopUserItem]
+    timings: list[QueryTiming] | None = Field(
+        default=None,
+        description=("Measured timings for different parts of the query generation process"),
+    )
+    warnings: list[DataWarehouseSyncWarning] | None = Field(
+        default=None,
+        description=(
+            "Warnings about data warehouse sources referenced by the query whose latest"
+            " sync failed, is paused, hit a billing limit, or is otherwise stale."
+            " Results may not reflect current source data. Accumulated across every"
+            " HogQL execution that contributes to this response — so insights backed by"
+            " warehouse tables (Trends, Funnels, etc.) receive the same warnings as raw"
+            " HogQL queries."
+        ),
+    )
+
+
 class MarketingAnalyticsAggregatedQueryResponse(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -20128,6 +20346,88 @@ class QueryResponseAlternative97(BaseModel):
     resolved_date_range: ResolvedDateRangeResponse | None = Field(
         default=None, description="The date range used for the query"
     )
+    results: list[MCPToolTopUserItem]
+    timings: list[QueryTiming] | None = Field(
+        default=None,
+        description=("Measured timings for different parts of the query generation process"),
+    )
+    warnings: list[DataWarehouseSyncWarning] | None = Field(
+        default=None,
+        description=(
+            "Warnings about data warehouse sources referenced by the query whose latest"
+            " sync failed, is paused, hit a billing limit, or is otherwise stale."
+            " Results may not reflect current source data. Accumulated across every"
+            " HogQL execution that contributes to this response — so insights backed by"
+            " warehouse tables (Trends, Funnels, etc.) receive the same warnings as raw"
+            " HogQL queries."
+        ),
+    )
+
+
+class QueryResponseAlternative98(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: str | None = Field(
+        default=None,
+        description=(
+            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
+        ),
+    )
+    hogql: str | None = Field(default=None, description="Generated HogQL query.")
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    query_status: QueryStatus | None = Field(
+        default=None,
+        description=("Query status indicates whether next to the provided data, a query is still running."),
+    )
+    resolved_compare_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None,
+        description=("The resolved previous/comparison period date range, when comparing against another period"),
+    )
+    resolved_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None, description="The date range used for the query"
+    )
+    results: list[MCPToolFailureItem]
+    timings: list[QueryTiming] | None = Field(
+        default=None,
+        description=("Measured timings for different parts of the query generation process"),
+    )
+    warnings: list[DataWarehouseSyncWarning] | None = Field(
+        default=None,
+        description=(
+            "Warnings about data warehouse sources referenced by the query whose latest"
+            " sync failed, is paused, hit a billing limit, or is otherwise stale."
+            " Results may not reflect current source data. Accumulated across every"
+            " HogQL execution that contributes to this response — so insights backed by"
+            " warehouse tables (Trends, Funnels, etc.) receive the same warnings as raw"
+            " HogQL queries."
+        ),
+    )
+
+
+class QueryResponseAlternative99(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: str | None = Field(
+        default=None,
+        description=(
+            "Query error. Returned only if 'explain' or `modifiers.debug` is true. Throws an error otherwise."
+        ),
+    )
+    hogql: str | None = Field(default=None, description="Generated HogQL query.")
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    query_status: QueryStatus | None = Field(
+        default=None,
+        description=("Query status indicates whether next to the provided data, a query is still running."),
+    )
+    resolved_compare_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None,
+        description=("The resolved previous/comparison period date range, when comparing against another period"),
+    )
+    resolved_date_range: ResolvedDateRangeResponse | None = Field(
+        default=None, description="The date range used for the query"
+    )
     results: list[PropertyValueItem]
     timings: list[QueryTiming] | None = Field(
         default=None,
@@ -22465,6 +22765,35 @@ class MCPHarnessBreakdownQuery(BaseModel):
     ) = None
     response: MCPHarnessBreakdownQueryResponse | None = None
     tags: QueryLogTags | None = None
+    version: float | None = Field(default=None, description="version of the node, used for schema migrations")
+
+
+class MCPToolFailuresQuery(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    dateRange: DateRange | None = None
+    kind: Literal["MCPToolFailuresQuery"] = "MCPToolFailuresQuery"
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    response: MCPToolFailuresQueryResponse | None = None
+    tags: QueryLogTags | None = None
+    toolName: str = Field(..., description="The raw $mcp_tool_name to scope $exception events to.")
+    version: float | None = Field(default=None, description="version of the node, used for schema migrations")
+
+
+class MCPToolTopUsersQuery(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    dateRange: DateRange | None = None
+    kind: Literal["MCPToolTopUsersQuery"] = "MCPToolTopUsersQuery"
+    modifiers: HogQLQueryModifiers | None = Field(default=None, description="Modifiers used when performing the query")
+    response: MCPToolTopUsersQueryResponse | None = None
+    tags: QueryLogTags | None = None
+    toolName: str = Field(
+        ...,
+        description=("The effective tool name to scope to (matched against the single-exec-resolved tool name)."),
+    )
     version: float | None = Field(default=None, description="version of the node, used for schema migrations")
 
 
@@ -25108,6 +25437,8 @@ class QueryResponseAlternative(
         | QueryResponseAlternative95
         | QueryResponseAlternative96
         | QueryResponseAlternative97
+        | QueryResponseAlternative98
+        | QueryResponseAlternative99
     ]
 ):
     root: (
@@ -25204,6 +25535,8 @@ class QueryResponseAlternative(
         | QueryResponseAlternative95
         | QueryResponseAlternative96
         | QueryResponseAlternative97
+        | QueryResponseAlternative98
+        | QueryResponseAlternative99
     )
 
 
@@ -26249,6 +26582,8 @@ class HogQLAutocomplete(BaseModel):
         | EndpointsUsageTableQuery
         | EndpointsUsageTrendsQuery
         | MCPHarnessBreakdownQuery
+        | MCPToolTopUsersQuery
+        | MCPToolFailuresQuery
         | None
     ) = Field(default=None, description="Query in whose context to validate.")
     startPosition: int = Field(..., description="Start position of the editor word")
@@ -26339,6 +26674,8 @@ class HogQLMetadata(BaseModel):
         | EndpointsUsageTableQuery
         | EndpointsUsageTrendsQuery
         | MCPHarnessBreakdownQuery
+        | MCPToolTopUsersQuery
+        | MCPToolFailuresQuery
         | None
     ) = Field(
         default=None,
@@ -26464,6 +26801,8 @@ class MaxInsightContext(BaseModel):
         | EndpointsUsageTableQuery
         | EndpointsUsageTrendsQuery
         | MCPHarnessBreakdownQuery
+        | MCPToolTopUsersQuery
+        | MCPToolFailuresQuery
         | PropertyValuesQuery
     ) = Field(..., discriminator="kind")
     type: Literal["insight"] = "insight"
@@ -26586,6 +26925,8 @@ class QueryRequest(BaseModel):
         | EndpointsUsageTableQuery
         | EndpointsUsageTrendsQuery
         | MCPHarnessBreakdownQuery
+        | MCPToolTopUsersQuery
+        | MCPToolFailuresQuery
         | PropertyValuesQuery
     ) = Field(
         ...,
@@ -26700,6 +27041,8 @@ class QuerySchemaRoot(
         | EndpointsUsageTableQuery
         | EndpointsUsageTrendsQuery
         | MCPHarnessBreakdownQuery
+        | MCPToolTopUsersQuery
+        | MCPToolFailuresQuery
         | PropertyValuesQuery
     ]
 ):
@@ -26784,6 +27127,8 @@ class QuerySchemaRoot(
         | EndpointsUsageTableQuery
         | EndpointsUsageTrendsQuery
         | MCPHarnessBreakdownQuery
+        | MCPToolTopUsersQuery
+        | MCPToolFailuresQuery
         | PropertyValuesQuery
     ) = Field(..., discriminator="kind")
 
@@ -26873,6 +27218,8 @@ class QueryUpgradeRequest(BaseModel):
         | EndpointsUsageTableQuery
         | EndpointsUsageTrendsQuery
         | MCPHarnessBreakdownQuery
+        | MCPToolTopUsersQuery
+        | MCPToolFailuresQuery
         | PropertyValuesQuery
     ) = Field(..., discriminator="kind")
 
@@ -26962,6 +27309,8 @@ class QueryUpgradeResponse(BaseModel):
         | EndpointsUsageTableQuery
         | EndpointsUsageTrendsQuery
         | MCPHarnessBreakdownQuery
+        | MCPToolTopUsersQuery
+        | MCPToolFailuresQuery
         | PropertyValuesQuery
     ) = Field(..., discriminator="kind")
 
@@ -27228,6 +27577,8 @@ class VisualizationArtifactContent(BaseModel):
         | EndpointsUsageTableQuery
         | EndpointsUsageTrendsQuery
         | MCPHarnessBreakdownQuery
+        | MCPToolTopUsersQuery
+        | MCPToolFailuresQuery
         | PropertyValuesQuery
     )
 
