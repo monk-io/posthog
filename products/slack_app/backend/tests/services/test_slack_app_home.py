@@ -439,7 +439,7 @@ class TestTasksCard:
         assert "`posthog/posthog`" in first
         assert "<https://slack.com/archives/C1/p1234567890123456|Thread>" in first
         assert "<https://github.com/posthog/posthog/pull/123|PR>" in first
-        assert "_5m ago_" in first
+        assert "_Updated 5m ago_" in first
 
     def test_task_with_no_repo_or_pr_skips_those_meta_parts(self):
         state = TasksState(

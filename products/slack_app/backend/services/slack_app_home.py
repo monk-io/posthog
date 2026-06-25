@@ -695,7 +695,9 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"_{empty_text}_"}})
         return blocks
 
-    for item in state.items:
+    for index, item in enumerate(state.items):
+        if index > 0:
+            blocks.append({"type": "divider"})
         blocks.append(_task_item_block(item))
 
     if state.total_pages > 1:
@@ -705,7 +707,11 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
 
 
 def _task_item_block(item: TaskItem) -> dict:
-    """One task row: bold linked title + dimmed meta line beneath."""
+    """One task row: bold linked title + dimmed meta line beneath.
+
+    Uses `\\n\\n` between title and meta so Slack renders a paragraph break
+    (extra vertical breathing room) rather than a tight single-line break.
+    """
     status_label = _TASK_STATUS_LABELS.get(item.status or "", "")
     title_line = f"*<{item.posthog_url}|{item.title}>*" if item.posthog_url else f"*{item.title}*"
     meta_parts: list[str] = []
@@ -718,8 +724,8 @@ def _task_item_block(item: TaskItem) -> dict:
     if item.pr_url:
         meta_parts.append(f"<{item.pr_url}|PR>")
     if item.updated_at_label:
-        meta_parts.append(f"_{item.updated_at_label}_")
-    text = title_line if not meta_parts else f"{title_line}\n{' · '.join(meta_parts)}"
+        meta_parts.append(f"_Updated {item.updated_at_label}_")
+    text = title_line if not meta_parts else f"{title_line}\n\n{' · '.join(meta_parts)}"
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
@@ -1397,7 +1403,7 @@ def _republish_home(
         logger.exception("slack_app_home_republish_failed")
 
 
-_TASKS_PAGE_SIZE = 20
+_TASKS_PAGE_SIZE = 10
 _TASKS_MAX_TOTAL = 200
 
 
