@@ -297,9 +297,9 @@ class TaskItem:
 class TasksState:
     """Inputs the renderer needs to draw the Tasks card.
 
-    ``items`` is already paginated to a single page; ``available_repos``
-    drives the repo dropdown options and is computed against the unfiltered
-    task set so picking a repo doesn't make the others disappear.
+    ``items`` is already paginated to a single page. ``available_repos``
+    is computed against the unfiltered set so picking a repo doesn't make
+    the others disappear from the dropdown.
     """
 
     items: tuple[TaskItem, ...] = ()
@@ -662,18 +662,15 @@ _TASK_STATUS_LABELS: dict[str, str] = dict(TASKS_STATUS_OPTIONS)
 def _tasks_section_blocks(state: TasksState) -> list[dict]:
     """Render the Tasks card.
 
-    Header carries the filters + Refresh; rows live inside a Block Kit
-    `data_table` so columns stay aligned without us hand-rolling fixed-width
-    text. A pagination strip below the table jumps between pages.
+    Header carries the filters + Refresh, each task renders as its own
+    section block (linked title + muted meta line), and a Prev/Next strip
+    paginates across pages.
     """
     blocks: list[dict] = [_section_title("🦔 Tasks", "Tasks you started by mentioning @PostHog.")]
 
     if state.has_any_tasks:
         blocks.append(_tasks_controls_block(state))
         if state.refreshed_at_epoch:
-            # Slack's mrkdwn date formatter auto-localises the time to the
-            # viewer; the fallback text is what non-Slack-rendered surfaces
-            # (search snippets, screen readers) see.
             blocks.append(
                 {
                     "type": "context",
@@ -698,7 +695,8 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"_{empty_text}_"}})
         return blocks
 
-    blocks.append(_tasks_data_table(state))
+    for item in state.items:
+        blocks.append(_task_item_block(item))
 
     if state.total_pages > 1:
         blocks.extend(_tasks_pagination_blocks(state))
@@ -706,49 +704,23 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
     return blocks
 
 
-_TABLE_EMPTY_CELL = "—"
-
-
-def _tasks_data_table(state: TasksState) -> dict:
-    header = [
-        _rt_raw("Task"),
-        _rt_raw("Status"),
-        _rt_raw("Thread"),
-        _rt_raw("Repo"),
-        _rt_raw("PR"),
-        _rt_raw("Updated"),
-    ]
-    rows: list[list[dict]] = [header]
-    for item in state.items:
-        rows.append(
-            [
-                _rt_link(item.posthog_url, item.title) if item.posthog_url else _rt_raw(item.title),
-                _rt_raw(_TASK_STATUS_LABELS.get(item.status or "", _TABLE_EMPTY_CELL)),
-                _rt_link(item.thread_url, "Open") if item.thread_url else _rt_raw(_TABLE_EMPTY_CELL),
-                _rt_raw(item.repository or _TABLE_EMPTY_CELL),
-                _rt_link(item.pr_url, "View PR") if item.pr_url else _rt_raw(_TABLE_EMPTY_CELL),
-                _rt_raw(item.updated_at_label or _TABLE_EMPTY_CELL),
-            ]
-        )
-    return {"type": "data_table", "caption": "Your tasks", "rows": rows}
-
-
-def _rt_raw(text: str) -> dict:
-    # Slack's data_table rejects empty `raw_text` cells with `must be more
-    # than 0 characters`. Callers should pass a placeholder for missing data.
-    return {"type": "raw_text", "text": text or _TABLE_EMPTY_CELL}
-
-
-def _rt_link(url: str, text: str) -> dict:
-    return {
-        "type": "rich_text",
-        "elements": [
-            {
-                "type": "rich_text_section",
-                "elements": [{"type": "link", "url": url, "text": text}],
-            }
-        ],
-    }
+def _task_item_block(item: TaskItem) -> dict:
+    """One task row: bold linked title + dimmed meta line beneath."""
+    status_label = _TASK_STATUS_LABELS.get(item.status or "", "")
+    title_line = f"*<{item.posthog_url}|{item.title}>*" if item.posthog_url else f"*{item.title}*"
+    meta_parts: list[str] = []
+    if status_label:
+        meta_parts.append(status_label)
+    if item.repository:
+        meta_parts.append(f"`{item.repository}`")
+    if item.thread_url:
+        meta_parts.append(f"<{item.thread_url}|Thread>")
+    if item.pr_url:
+        meta_parts.append(f"<{item.pr_url}|PR>")
+    if item.updated_at_label:
+        meta_parts.append(f"_{item.updated_at_label}_")
+    text = title_line if not meta_parts else f"{title_line}\n{' · '.join(meta_parts)}"
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
 def _tasks_pagination_blocks(state: TasksState) -> list[dict]:

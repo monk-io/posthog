@@ -396,11 +396,17 @@ class TestTasksCard:
         defaults.update(overrides)
         return TaskItem(**defaults)
 
-    def _data_table(self, view: dict) -> dict | None:
-        for block in view["blocks"]:
-            if block.get("type") == "data_table":
-                return block
-        return None
+    def _task_item_sections(self, view: dict, expected_count: int) -> list[dict]:
+        """Return the per-task section blocks (linked title + meta line)."""
+        sections = [
+            b
+            for b in view["blocks"]
+            if b.get("type") == "section"
+            and isinstance(b.get("text"), dict)
+            and "https://app/project/" in b["text"].get("text", "")
+        ]
+        assert len(sections) == expected_count, f"expected {expected_count} task sections, found {len(sections)}"
+        return sections
 
     def test_card_hidden_when_state_is_none(self):
         view = render_home_view(**self._kwargs())
@@ -409,43 +415,46 @@ class TestTasksCard:
     def test_first_use_state_invites_user_to_mention(self):
         view = render_home_view(**self._kwargs(tasks_state=TasksState()))
         text = _all_text(view)
-        # Title carries the hog emoji.
         assert "🦔 Tasks" in text
         assert "Mention @PostHog" in text
-        # No table, no pagination when there are no mappings yet.
-        assert self._data_table(view) is None
 
-    def test_renders_data_table_with_header_and_one_row_per_item(self):
+    def test_each_task_renders_as_its_own_section_block(self):
         state = TasksState(
             items=(self._item(), self._item(title="Refactor mention dispatcher", status="completed", pr_url=None)),
-            available_repos=("posthog/posthog", "posthog/posthog-js"),
+            available_repos=("posthog/posthog",),
             has_any_tasks=True,
             page=0,
             total_pages=1,
             total_filtered=2,
         )
         view = render_home_view(**self._kwargs(tasks_state=state))
-        table = self._data_table(view)
-        assert table is not None
-        # Header row + one row per item.
-        assert len(table["rows"]) == 3
-        header_cells = [cell.get("text") for cell in table["rows"][0]]
-        assert header_cells == ["Task", "Status", "Thread", "Repo", "PR", "Updated"]
+        sections = self._task_item_sections(view, expected_count=2)
+        # Each section's text is a single mrkdwn blob: bold linked title on
+        # the first line, dimmed meta on the second.
+        first = sections[0]["text"]["text"]
+        assert "*<https://app/project/1/tasks/abc|Fix flaky retention test>*" in first
+        # Meta line carries status, repo, thread link, PR link, and the
+        # updated_at label — all space-separated by " · ".
+        assert "🔄 In progress" in first
+        assert "`posthog/posthog`" in first
+        assert "<https://slack.com/archives/C1/p1234567890123456|Thread>" in first
+        assert "<https://github.com/posthog/posthog/pull/123|PR>" in first
+        assert "_5m ago_" in first
 
-    def test_table_cells_carry_links_and_status_label(self):
-        state = TasksState(items=(self._item(),), has_any_tasks=True, total_pages=1, total_filtered=1)
-        table = self._data_table(render_home_view(**self._kwargs(tasks_state=state)))
-        assert table is not None
-        body = table["rows"][1]
-        # Columns: Task | Status | Thread | Repo | PR | Updated
-        title_link = body[0]["elements"][0]["elements"][0]
-        assert title_link["url"] == "https://app/project/1/tasks/abc"
-        assert title_link["text"] == "Fix flaky retention test"
-        assert body[1]["text"] == "🔄 In progress"
-        assert body[2]["elements"][0]["elements"][0]["url"] == "https://slack.com/archives/C1/p1234567890123456"
-        assert body[3]["text"] == "posthog/posthog"
-        assert body[4]["elements"][0]["elements"][0]["url"] == "https://github.com/posthog/posthog/pull/123"
-        assert body[5]["text"] == "5m ago"
+    def test_task_with_no_repo_or_pr_skips_those_meta_parts(self):
+        state = TasksState(
+            items=(self._item(repository=None, pr_url=None),),
+            has_any_tasks=True,
+            page=0,
+            total_pages=1,
+            total_filtered=1,
+        )
+        view = render_home_view(**self._kwargs(tasks_state=state))
+        section = self._task_item_sections(view, expected_count=1)[0]
+        text = section["text"]["text"]
+        # No backticks → no repo segment; no PR link.
+        assert "`" not in text
+        assert "|PR>" not in text
 
     def test_repo_dropdown_hidden_when_only_one_repo(self):
         state = TasksState(
@@ -469,8 +478,15 @@ class TestTasksCard:
         )
         view = render_home_view(**self._kwargs(tasks_state=state))
         assert "No tasks match" in _all_text(view)
-        # No table when there's nothing to show, but the filter controls still render.
-        assert self._data_table(view) is None
+        # No task sections render when items is empty.
+        sections = [
+            b
+            for b in view["blocks"]
+            if b.get("type") == "section"
+            and isinstance(b.get("text"), dict)
+            and "https://app/project/" in b["text"].get("text", "")
+        ]
+        assert sections == []
 
     def test_pagination_buttons_render_with_target_pages(self):
         from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_PAGE
