@@ -146,7 +146,7 @@ def serializedATN():
         1,77,1,77,1,77,3,77,1548,8,77,1,77,1,77,3,77,1552,8,77,1,77,3,77,
         1555,8,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,3,77,1564,8,77,1,77,
         1,77,1,77,1,77,3,77,1570,8,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,
-        1,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,3,77,1589,8,77,
+        1,77,1,77,1,77,1,77,3,77,1583,8,77,1,77,1,77,1,77,1,77,1,77,1,77,
         1,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,1,77,
         1,77,1,77,1,77,1,77,1,77,1,77,3,77,1610,8,77,1,77,1,77,1,77,1,77,
         1,77,1,77,1,77,1,77,1,77,3,77,1621,8,77,1,77,1,77,3,77,1625,8,77,
@@ -683,12 +683,12 @@ def serializedATN():
         1569,1568,1,0,0,0,1569,1570,1,0,0,0,1570,1571,1,0,0,0,1571,1572,
         5,25,0,0,1572,1573,5,39,0,0,1573,1664,3,154,77,21,1574,1575,10,19,
         0,0,1575,1576,5,166,0,0,1576,1664,3,154,77,20,1577,1578,10,18,0,
-        0,1578,1579,5,174,0,0,1579,1664,3,154,77,19,1580,1581,10,16,0,0,
-        1581,1582,5,2,0,0,1582,1664,3,154,77,17,1583,1584,10,15,0,0,1584,
-        1585,5,78,0,0,1585,1664,3,154,77,16,1586,1588,10,14,0,0,1587,1589,
-        5,73,0,0,1588,1587,1,0,0,0,1588,1589,1,0,0,0,1589,1590,1,0,0,0,1590,
-        1591,5,9,0,0,1591,1592,3,154,77,0,1592,1593,5,2,0,0,1593,1594,3,
-        154,77,15,1594,1664,1,0,0,0,1595,1596,10,13,0,0,1596,1597,5,177,
+        0,1578,1579,5,174,0,0,1579,1664,3,154,77,19,1580,1582,10,16,0,0,
+        1581,1583,5,73,0,0,1582,1581,1,0,0,0,1582,1583,1,0,0,0,1583,1584,
+        1,0,0,0,1584,1585,5,9,0,0,1585,1586,3,154,77,0,1586,1587,5,2,0,0,
+        1587,1588,3,154,77,17,1588,1664,1,0,0,0,1589,1590,10,15,0,0,1590,
+        1591,5,2,0,0,1591,1664,3,154,77,16,1592,1593,10,14,0,0,1593,1594,
+        5,78,0,0,1594,1664,3,154,77,15,1595,1596,10,13,0,0,1596,1597,5,177,
         0,0,1597,1598,3,154,77,0,1598,1599,5,150,0,0,1599,1600,3,154,77,
         13,1600,1664,1,0,0,0,1601,1602,10,39,0,0,1602,1603,5,165,0,0,1603,
         1604,3,48,24,0,1604,1605,5,186,0,0,1605,1664,1,0,0,0,1606,1607,10,
@@ -712,7 +712,7 @@ def serializedATN():
         220,110,0,1660,1662,5,143,0,0,1661,1659,1,0,0,0,1661,1660,1,0,0,
         0,1662,1664,1,0,0,0,1663,1524,1,0,0,0,1663,1531,1,0,0,0,1663,1538,
         1,0,0,0,1663,1566,1,0,0,0,1663,1574,1,0,0,0,1663,1577,1,0,0,0,1663,
-        1580,1,0,0,0,1663,1583,1,0,0,0,1663,1586,1,0,0,0,1663,1595,1,0,0,
+        1580,1,0,0,0,1663,1589,1,0,0,0,1663,1592,1,0,0,0,1663,1595,1,0,0,
         0,1663,1601,1,0,0,0,1663,1606,1,0,0,0,1663,1612,1,0,0,0,1663,1617,
         1,0,0,0,1663,1627,1,0,0,0,1663,1630,1,0,0,0,1663,1633,1,0,0,0,1663,
         1639,1,0,0,0,1663,1642,1,0,0,0,1663,1645,1,0,0,0,1663,1648,1,0,0,
@@ -873,7 +873,7 @@ def serializedATN():
         1094,1099,1104,1110,1116,1122,1131,1135,1142,1148,1155,1159,1171,
         1176,1185,1189,1222,1270,1298,1362,1370,1376,1379,1382,1390,1400,
         1406,1409,1412,1420,1428,1431,1435,1438,1443,1452,1464,1472,1480,
-        1484,1502,1506,1511,1522,1528,1535,1547,1551,1554,1563,1569,1588,
+        1484,1502,1506,1511,1522,1528,1535,1547,1551,1554,1563,1569,1582,
         1609,1620,1624,1654,1661,1663,1665,1674,1678,1687,1691,1695,1700,
         1708,1712,1717,1724,1737,1746,1756,1763,1770,1783,1790,1794,1798,
         1803,1807,1810,1820,1828,1837,1840,1847,1863,1873,1881,1891,1894,
@@ -11224,53 +11224,53 @@ class HogQLParser ( Parser ):
                         pass
 
                     elif la_ == 7:
-                        localctx = HogQLParser.ColumnExprAndContext(self, HogQLParser.ColumnExprContext(self, _parentctx, _parentState))
+                        localctx = HogQLParser.ColumnExprBetweenContext(self, HogQLParser.ColumnExprContext(self, _parentctx, _parentState))
                         self.pushNewRecursionContext(localctx, _startState, self.RULE_columnExpr)
                         self.state = 1580
                         if not self.precpred(self._ctx, 16):
                             from antlr4.error.Errors import FailedPredicateException
                             raise FailedPredicateException(self, "self.precpred(self._ctx, 16)")
-                        self.state = 1581
-                        self.match(HogQLParser.AND)
                         self.state = 1582
+                        self._errHandler.sync(self)
+                        _la = self._input.LA(1)
+                        if _la==73:
+                            self.state = 1581
+                            self.match(HogQLParser.NOT)
+
+
+                        self.state = 1584
+                        self.match(HogQLParser.BETWEEN)
+                        self.state = 1585
+                        self.columnExpr(0)
+                        self.state = 1586
+                        self.match(HogQLParser.AND)
+                        self.state = 1587
                         self.columnExpr(17)
                         pass
 
                     elif la_ == 8:
-                        localctx = HogQLParser.ColumnExprOrContext(self, HogQLParser.ColumnExprContext(self, _parentctx, _parentState))
+                        localctx = HogQLParser.ColumnExprAndContext(self, HogQLParser.ColumnExprContext(self, _parentctx, _parentState))
                         self.pushNewRecursionContext(localctx, _startState, self.RULE_columnExpr)
-                        self.state = 1583
+                        self.state = 1589
                         if not self.precpred(self._ctx, 15):
                             from antlr4.error.Errors import FailedPredicateException
                             raise FailedPredicateException(self, "self.precpred(self._ctx, 15)")
-                        self.state = 1584
-                        self.match(HogQLParser.OR)
-                        self.state = 1585
+                        self.state = 1590
+                        self.match(HogQLParser.AND)
+                        self.state = 1591
                         self.columnExpr(16)
                         pass
 
                     elif la_ == 9:
-                        localctx = HogQLParser.ColumnExprBetweenContext(self, HogQLParser.ColumnExprContext(self, _parentctx, _parentState))
+                        localctx = HogQLParser.ColumnExprOrContext(self, HogQLParser.ColumnExprContext(self, _parentctx, _parentState))
                         self.pushNewRecursionContext(localctx, _startState, self.RULE_columnExpr)
-                        self.state = 1586
+                        self.state = 1592
                         if not self.precpred(self._ctx, 14):
                             from antlr4.error.Errors import FailedPredicateException
                             raise FailedPredicateException(self, "self.precpred(self._ctx, 14)")
-                        self.state = 1588
-                        self._errHandler.sync(self)
-                        _la = self._input.LA(1)
-                        if _la==73:
-                            self.state = 1587
-                            self.match(HogQLParser.NOT)
-
-
-                        self.state = 1590
-                        self.match(HogQLParser.BETWEEN)
-                        self.state = 1591
-                        self.columnExpr(0)
-                        self.state = 1592
-                        self.match(HogQLParser.AND)
                         self.state = 1593
+                        self.match(HogQLParser.OR)
+                        self.state = 1594
                         self.columnExpr(15)
                         pass
 

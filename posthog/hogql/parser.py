@@ -1798,10 +1798,37 @@ class HogQLParseTreeConverter(ParseTreeVisitor):
         return _unquote_identifier(ctx.getText())
 
     def visitColumnExprBetween(self, ctx: HogQLParser.ColumnExprBetweenContext):
+        # ANTLR forces BETWEEN's middle (`low`) operand to precedence 0, so for
+        # `a BETWEEN b AND c AND d` it over-greedily absorbs the trailing conjuncts
+        # (`low` parses as `b AND c`, `high` as `d`). Re-associate to ClickHouse/SQL
+        # precedence — `(a BETWEEN b AND c) AND d` — by splitting the low operand's
+        # top-level AND chain into units, appending high, using the first two as the
+        # bounds and ANDing the rest around the BETWEEN. Parenthesised groups stay a
+        # single opaque unit, so `BETWEEN (b AND c) AND d` keeps `b AND c` as the bound.
+        negated = bool(ctx.NOT())
+        units = self._between_and_units(ctx.columnExpr(1))
+        units.append(ctx.columnExpr(2))
+
         expr = self.visit(ctx.columnExpr(0))
-        low = self.visit(ctx.columnExpr(1))
-        high = self.visit(ctx.columnExpr(2))
-        return ast.BetweenExpr(expr=expr, low=low, high=high, negated=bool(ctx.NOT()))
+        low = self.visit(units[0])
+        high = self.visit(units[1])
+        between = ast.BetweenExpr(expr=expr, low=low, high=high, negated=negated)
+        if len(units) == 2:
+            return between
+        if self.start is not None:
+            between.start = ctx.columnExpr(0).start.start
+            between.end = units[1].stop.stop + 1
+        exprs: list[ast.Expr] = [between]
+        for unit in units[2:]:
+            trailing = self.visit(unit)
+            exprs.extend(trailing.exprs if isinstance(trailing, ast.And) else [trailing])
+        return ast.And(exprs=exprs)
+
+    def _between_and_units(self, ctx: HogQLParser.ColumnExprContext) -> list[HogQLParser.ColumnExprContext]:
+        # Top-level conjuncts of a BETWEEN low operand, not descending into parens.
+        if isinstance(ctx, HogQLParser.ColumnExprAndContext):
+            return self._between_and_units(ctx.columnExpr(0)) + self._between_and_units(ctx.columnExpr(1))
+        return [ctx]
 
     def visitColumnExprParens(self, ctx: HogQLParser.ColumnExprParensContext):
         return self.visit(ctx.columnExpr())
