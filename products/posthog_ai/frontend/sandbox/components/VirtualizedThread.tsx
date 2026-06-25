@@ -39,6 +39,12 @@ interface RowContextValue {
     ariaAttributes: Record<string, unknown>
 }
 
+interface ScrollMetrics {
+    scrollTop: number
+    scrollHeight: number
+    clientHeight: number
+}
+
 const RootContext = createContext<RootContextValue | null>(null)
 const RowContext = createContext<RowContextValue | null>(null)
 
@@ -114,6 +120,7 @@ function Root<T>({
     const rowCount = items.length + (hasHeader ? 1 : 0) + (hasFooter ? 1 : 0)
 
     const pinnedRef = useRef(stickToBottom)
+    const lastScrollMetricsRef = useRef<ScrollMetrics | null>(null)
 
     const renderRow = useCallback(
         (index: number): ReactNode => {
@@ -140,13 +147,32 @@ function Root<T>({
 
     const handleScroll = useCallback(
         (event: UIEvent<HTMLDivElement>): void => {
+            const el = event.currentTarget
+            const metrics: ScrollMetrics = {
+                scrollTop: el.scrollTop,
+                scrollHeight: el.scrollHeight,
+                clientHeight: el.clientHeight,
+            }
+            const previousMetrics = lastScrollMetricsRef.current
+            lastScrollMetricsRef.current = metrics
+
             if (!stickToBottom) {
                 return
             }
-            const el = event.currentTarget
-            pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_THRESHOLD
+            if (metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= BOTTOM_THRESHOLD) {
+                pinnedRef.current = true
+                return
+            }
+
+            const userScrolledUp = previousMetrics ? metrics.scrollTop < previousMetrics.scrollTop - 1 : false
+            if (pinnedRef.current && !userScrolledUp) {
+                requestAnimationFrame(scrollToBottom)
+                return
+            }
+
+            pinnedRef.current = false
         },
-        [stickToBottom]
+        [stickToBottom, scrollToBottom]
     )
 
     const handleRowsRendered = useCallback((): void => {
