@@ -64,9 +64,14 @@ ACTION_TASKS_PAGE = "slack_app_home:tasks_page"
 # the handler can read them back on each pick.
 BLOCK_TASKS_CONTROLS = "block_tasks_controls"
 
+# Sentinel value the "All …" options carry — Slack rejects empty `value`
+# strings, so the resolver treats this as "no filter".
+TASKS_FILTER_ALL = "all"
+
 # Status keys the filter picker exposes — superset of `TaskRun.Status` values
 # we surface on the card. Kept here so the renderer and resolver stay in sync.
 TASKS_STATUS_OPTIONS: tuple[tuple[str, str], ...] = (
+    (TASKS_FILTER_ALL, "All statuses"),
     ("in_progress", "🔄 In progress"),
     ("completed", "✅ Completed"),
     ("failed", "❌ Failed"),
@@ -408,7 +413,7 @@ def _active_model_blocks(effective: AIPreferences, source: PreferenceSource) -> 
     know which one, so don't lie. Just say so and let the user override.
     """
     header = _section_title(
-        "AI model",
+        "🤖 AI model",
         "Which Claude / Codex configuration handles your @PostHog mentions.",
     )
     source_blurb = {"type": "context", "elements": [{"type": "mrkdwn", "text": f"Source: {source.label}"}]}
@@ -460,7 +465,7 @@ def _project_section_blocks(state: ProjectState, *, is_admin: bool) -> list[dict
 
     blocks: list[dict] = [
         _section_title(
-            "Project routing",
+            "🧭 Project routing",
             "Which PostHog project @PostHog mentions land in. Personal picks override the workspace default.",
         ),
     ]
@@ -523,7 +528,7 @@ def _account_section_blocks(account_state: AccountState) -> list[dict]:
     """
     if account_state.linked_email:
         return [
-            _section_title("Linked PostHog account"),
+            _section_title("🔗 Linked PostHog account"),
             {
                 "type": "section",
                 "text": {
@@ -554,7 +559,7 @@ def _account_section_blocks(account_state: AccountState) -> list[dict]:
         ]
     blocks: list[dict] = [
         _section_title(
-            "Connect your PostHog account",
+            "🔗 Connect your PostHog account",
             "Link your Slack identity to a PostHog user so @PostHog knows it's you without falling back to email matching.",
         ),
     ]
@@ -785,8 +790,11 @@ def _tasks_controls_block(state: TasksState) -> dict:
 
     if len(state.available_repos) >= 2:
         repo_options = [
-            {"text": {"type": "plain_text", "text": repo, "emoji": True}, "value": repo}
-            for repo in state.available_repos
+            {"text": {"type": "plain_text", "text": "All repos", "emoji": True}, "value": TASKS_FILTER_ALL},
+            *(
+                {"text": {"type": "plain_text", "text": repo, "emoji": True}, "value": repo}
+                for repo in state.available_repos
+            ),
         ]
         repo_select: dict[str, Any] = {
             "type": "static_select",
@@ -1417,7 +1425,7 @@ def _republish_home(
         logger.exception("slack_app_home_republish_failed")
 
 
-_TASKS_PAGE_SIZE = 15
+_TASKS_PAGE_SIZE = 20
 _TASKS_MAX_TOTAL = 200
 
 
@@ -1507,11 +1515,15 @@ def _resolve_tasks_state(
             repos_seen.append(t.repository)
             seen_repo_set.add(t.repository)
 
+    # `selected_*` is None when the user has never picked, and `TASKS_FILTER_ALL`
+    # when they explicitly reset back to "All …". Either is a no-op filter.
+    effective_repo = selected_repo if selected_repo and selected_repo != TASKS_FILTER_ALL else None
+    effective_status = selected_status if selected_status and selected_status != TASKS_FILTER_ALL else None
     filtered = [
         item
         for item in all_items
-        if (selected_repo is None or item.repository == selected_repo)
-        and (selected_status is None or item.status == selected_status)
+        if (effective_repo is None or item.repository == effective_repo)
+        and (effective_status is None or item.status == effective_status)
     ]
 
     total_filtered = len(filtered)
