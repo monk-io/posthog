@@ -677,6 +677,9 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
     return blocks
 
 
+_TABLE_EMPTY_CELL = "—"
+
+
 def _tasks_data_table(state: TasksState) -> dict:
     header = [
         _rt_raw("Task"),
@@ -690,17 +693,19 @@ def _tasks_data_table(state: TasksState) -> dict:
         rows.append(
             [
                 _rt_link(item.posthog_url, item.title) if item.posthog_url else _rt_raw(item.title),
-                _rt_raw(item.repository or ""),
-                _rt_raw(_TASK_STATUS_LABELS.get(item.status or "", "")),
-                _rt_link(item.thread_url, "Open") if item.thread_url else _rt_raw(""),
-                _rt_link(item.pr_url, "View PR") if item.pr_url else _rt_raw(""),
+                _rt_raw(item.repository or _TABLE_EMPTY_CELL),
+                _rt_raw(_TASK_STATUS_LABELS.get(item.status or "", _TABLE_EMPTY_CELL)),
+                _rt_link(item.thread_url, "Open") if item.thread_url else _rt_raw(_TABLE_EMPTY_CELL),
+                _rt_link(item.pr_url, "View PR") if item.pr_url else _rt_raw(_TABLE_EMPTY_CELL),
             ]
         )
     return {"type": "data_table", "caption": "Your tasks", "rows": rows}
 
 
 def _rt_raw(text: str) -> dict:
-    return {"type": "raw_text", "text": text}
+    # Slack's data_table rejects empty `raw_text` cells with `must be more
+    # than 0 characters`. Callers should pass a placeholder for missing data.
+    return {"type": "raw_text", "text": text or _TABLE_EMPTY_CELL}
 
 
 def _rt_link(url: str, text: str) -> dict:
