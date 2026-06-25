@@ -123,7 +123,7 @@ function WorkflowRunMetrics(props: WorkflowLogicProps): JSX.Element {
                     onSelectAction={(actionId) => setParams({ ...params, instanceId: actionId })}
                 />
             ) : selectedAction?.type === 'function_email' ? (
-                <EmailMetricsSummary logicKey={logicKey} />
+                <EmailMetricsSummary logicKey={logicKey} workflowId={props.id} actionId={params.instanceId} />
             ) : (
                 <>
                     <div className="flex flex-row gap-2 flex-wrap justify-center">
@@ -251,7 +251,7 @@ function BatchJobMetrics({ job }: { job: HogFlowBatchJob }): JSX.Element {
                     onSelectAction={(actionId) => setParams({ ...params, instanceId: actionId })}
                 />
             ) : selectedAction?.type === 'function_email' ? (
-                <EmailMetricsSummary logicKey={logicKey} />
+                <EmailMetricsSummary logicKey={logicKey} workflowId={workflow.id} actionId={params.instanceId} />
             ) : (
                 <>
                     <div className="flex flex-row gap-2 flex-wrap justify-center">
