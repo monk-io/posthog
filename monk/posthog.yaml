@@ -1,0 +1,351 @@
+namespace: posthog
+
+postgres:
+  defines: runnable
+  metadata:
+    name: PostHog Postgres
+    description: Postgres metadata store for a local Monk deployment of PostHog.
+    tags: posthog,postgres,standalone
+  variables:
+    postgres-image-tag:
+      type: string
+      value: 15.12-alpine
+      description: Public postgres image tag to run.
+    postgres-user:
+      type: string
+      value: posthog
+      description: Database user created for PostHog. Local stack uses host trust authentication and does not expose Postgres publicly.
+    postgres-database:
+      type: string
+      value: posthog
+      description: Database name created for PostHog application metadata.
+  containers:
+    postgres:
+      image: docker.io/library/postgres
+      image-tag: <- $postgres-image-tag
+      environment:
+        - <- `POSTGRES_USER=${postgres-user}`
+        - <- `POSTGRES_DB=${postgres-database}`
+        - POSTGRES_HOST_AUTH_METHOD=trust
+      paths:
+        - <- `${monk-volume-path}/posthog/postgres:/var/lib/postgresql/data`
+  services:
+    postgres:
+      container: postgres
+      port: 5432
+      protocol: tcp
+      description: Private Postgres service consumed by PostHog.
+
+redis:
+  defines: runnable
+  metadata:
+    name: PostHog Redis
+    description: Redis cache and queue coordination service for PostHog.
+    tags: posthog,redis,standalone
+  variables:
+    redis-image-tag:
+      type: string
+      value: 7.2-alpine
+      description: Public redis image tag to run.
+    redis-maxmemory:
+      type: string
+      value: 200mb
+      description: Maximum Redis memory for the local verification stack.
+  containers:
+    redis:
+      image: docker.io/library/redis
+      image-tag: <- $redis-image-tag
+      bash: <- `redis-server --maxmemory-policy allkeys-lru --maxmemory ${redis-maxmemory}`
+      paths:
+        - <- `${monk-volume-path}/posthog/redis:/data`
+  services:
+    redis:
+      container: redis
+      port: 6379
+      protocol: tcp
+      description: Private Redis service consumed by PostHog.
+
+clickhouse:
+  defines: runnable
+  metadata:
+    name: PostHog ClickHouse
+    description: ClickHouse analytics datastore for PostHog events and query results.
+    tags: posthog,clickhouse,analytics,standalone
+  connections:
+    kafka:
+      runnable: posthog/redpanda
+      service: kafka
+  variables:
+    clickhouse-image-tag:
+      type: string
+      value: 26.3.10.60
+      description: Public ClickHouse server image tag aligned with PostHog compose defaults.
+    clickhouse-database:
+      type: string
+      value: posthog
+      description: ClickHouse database name used by PostHog.
+    kafka-host:
+      type: string
+      value: <- connection-hostname("kafka")
+      description: Kafka-compatible broker hostname resolved through a Monk connection.
+    kafka-port:
+      type: string
+      value: <- connection-port("kafka")
+      description: Kafka-compatible broker port resolved through a Monk connection.
+    kafka-hosts:
+      type: string
+      value: <- `${kafka-host}:${kafka-port}`
+      description: Broker connection string passed to ClickHouse.
+  containers:
+    clickhouse:
+      image: docker.io/clickhouse/clickhouse-server
+      image-tag: <- $clickhouse-image-tag
+      environment:
+        - CLICKHOUSE_SKIP_USER_SETUP=1
+        - <- `CLICKHOUSE_DB=${clickhouse-database}`
+        - <- `KAFKA_HOSTS=${kafka-hosts}`
+      paths:
+        - <- `${monk-volume-path}/posthog/clickhouse:/var/lib/clickhouse`
+  services:
+    http:
+      container: clickhouse
+      port: 8123
+      protocol: tcp
+      description: Private ClickHouse HTTP API used by PostHog.
+    native:
+      container: clickhouse
+      port: 9000
+      protocol: tcp
+      description: Private ClickHouse native protocol endpoint.
+  depends:
+    wait-for:
+      runnables:
+        - posthog/redpanda
+      timeout: 120
+
+redpanda:
+  defines: runnable
+  metadata:
+    name: PostHog Redpanda
+    description: Kafka-compatible event bus for PostHog ingestion and ClickHouse integrations.
+    tags: posthog,redpanda,kafka,standalone
+  variables:
+    redpanda-image-tag:
+      type: string
+      value: v25.1.9
+      description: Public Redpanda image tag aligned with PostHog compose defaults.
+  containers:
+    redpanda:
+      image: docker.io/redpandadata/redpanda
+      image-tag: <- $redpanda-image-tag
+      bash: redpanda start --kafka-addr internal://0.0.0.0:9092 --advertise-kafka-addr internal://127.0.0.1:9092 --rpc-addr 0.0.0.0:33145 --advertise-rpc-addr 127.0.0.1:33145 --pandaproxy-addr 0.0.0.0:8082 --schema-registry-addr 0.0.0.0:8081 --mode dev-container --smp 1 --memory 1G --reserve-memory 0M --overprovisioned --set redpanda.auto_create_topics_enabled=true
+      paths:
+        - <- `${monk-volume-path}/posthog/redpanda:/var/lib/redpanda/data`
+  services:
+    kafka:
+      container: redpanda
+      port: 9092
+      protocol: tcp
+      description: Private Kafka-compatible broker endpoint.
+    admin:
+      container: redpanda
+      port: 9644
+      protocol: tcp
+      description: Private Redpanda admin endpoint for readiness checks.
+
+seaweedfs:
+  defines: runnable
+  metadata:
+    name: PostHog SeaweedFS
+    description: S3-compatible object storage for PostHog blobs, exports, and replay data.
+    tags: posthog,seaweedfs,s3,standalone
+  variables:
+    seaweedfs-image-tag:
+      type: string
+      value: 4.05
+      description: Public SeaweedFS image tag used for local S3-compatible object storage.
+  containers:
+    seaweedfs:
+      image: docker.io/chrislusf/seaweedfs
+      image-tag: <- $seaweedfs-image-tag
+      bash: weed server -dir=/data -s3 -s3.port=8333 -master.port=9333 -volume.port=8081 -ip=0.0.0.0
+      paths:
+        - <- `${monk-volume-path}/posthog/seaweedfs:/data`
+  services:
+    s3:
+      container: seaweedfs
+      port: 8333
+      protocol: tcp
+      description: Private S3-compatible API endpoint for PostHog object storage.
+    master:
+      container: seaweedfs
+      port: 9333
+      protocol: tcp
+      description: Private SeaweedFS master API endpoint.
+
+web:
+  defines: runnable
+  metadata:
+    name: PostHog web
+    description: PostHog Django web application using public PostHog images and Monk-wired backing services.
+    tags: posthog,analytics,web,standalone
+  connections:
+    postgres:
+      runnable: posthog/postgres
+      service: postgres
+    redis:
+      runnable: posthog/redis
+      service: redis
+    clickhouse:
+      runnable: posthog/clickhouse
+      service: http
+    kafka:
+      runnable: posthog/redpanda
+      service: kafka
+    seaweedfs:
+      runnable: posthog/seaweedfs
+      service: s3
+  variables:
+    posthog-image-tag:
+      type: string
+      value: latest
+      description: Public docker.io/posthog/posthog image tag to run.
+    http-port:
+      type: int
+      value: 18080
+      description: Host port published for local PostHog HTTP verification.
+    site-url:
+      type: string
+      value: http://localhost:18080
+      description: Browser-facing URL for the local verification deployment.
+    postgres-user:
+      type: string
+      value: posthog
+      description: Database user used in the Postgres connection string.
+    postgres-database:
+      type: string
+      value: posthog
+      description: Database name used in the Postgres connection string.
+    postgres-host:
+      type: string
+      value: <- connection-hostname("postgres")
+      description: Postgres hostname resolved through a Monk connection.
+    postgres-port:
+      type: string
+      value: <- connection-port("postgres")
+      description: Postgres port resolved through a Monk connection.
+    postgres-url:
+      type: string
+      value: <- `postgres://${postgres-user}@${postgres-host}:${postgres-port}/${postgres-database}`
+      description: Passwordless private-network Postgres URL for the local verification stack.
+    redis-host:
+      type: string
+      value: <- connection-hostname("redis")
+      description: Redis hostname resolved through a Monk connection.
+    redis-port:
+      type: string
+      value: <- connection-port("redis")
+      description: Redis port resolved through a Monk connection.
+    redis-url:
+      type: string
+      value: <- `redis://${redis-host}:${redis-port}/`
+      description: Redis URL assembled from Monk connection details.
+    clickhouse-host:
+      type: string
+      value: <- connection-hostname("clickhouse")
+      description: ClickHouse hostname resolved through a Monk connection.
+    clickhouse-port:
+      type: string
+      value: <- connection-port("clickhouse")
+      description: ClickHouse HTTP port resolved through a Monk connection.
+    kafka-host:
+      type: string
+      value: <- connection-hostname("kafka")
+      description: Kafka-compatible broker hostname resolved through a Monk connection.
+    kafka-port:
+      type: string
+      value: <- connection-port("kafka")
+      description: Kafka-compatible broker port resolved through a Monk connection.
+    kafka-hosts:
+      type: string
+      value: <- `${kafka-host}:${kafka-port}`
+      description: Kafka-compatible broker connection string assembled from Monk connection details.
+    seaweedfs-host:
+      type: string
+      value: <- connection-hostname("seaweedfs")
+      description: SeaweedFS S3 hostname resolved through a Monk connection.
+    seaweedfs-port:
+      type: string
+      value: <- connection-port("seaweedfs")
+      description: SeaweedFS S3 port resolved through a Monk connection.
+    object-storage-endpoint:
+      type: string
+      value: <- `http://${seaweedfs-host}:${seaweedfs-port}`
+      description: Private S3-compatible endpoint assembled from Monk connection details.
+    django-secret-key:
+      type: string
+      value: monk-local-verification-secret-key-override-when-inheriting
+      description: Sensitive Django signing key for the local verification deployment; inheriting production templates must override this with secret("posthog_secret_key").
+  containers:
+    web:
+      image: docker.io/posthog/posthog
+      image-tag: <- $posthog-image-tag
+      bash: python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000
+      environment:
+        - SKIP_SERVICE_VERSION_REQUIREMENTS=1
+        - DISABLE_SECURE_SSL_REDIRECT=true
+        - SECURE_COOKIES=false
+        - ALLOWED_HOSTS=*
+        - DEPLOYMENT=self-hosted
+        - OTEL_SDK_DISABLED=true
+        - OPT_OUT_CAPTURE=true
+        - POSTHOG_SKIP_MIGRATION_CHECKS=1
+        - <- `SECRET_KEY=${django-secret-key}`
+        - <- `SITE_URL=${site-url}`
+        - <- `DATABASE_URL=${postgres-url}`
+        - <- `PERSONS_DATABASE_URL=${postgres-url}`
+        - <- `BEHAVIORAL_COHORTS_DATABASE_URL=${postgres-url}`
+        - <- `PERSONS_DB_WRITER_URL=${postgres-url}`
+        - <- `PERSONS_DB_READER_URL=${postgres-url}`
+        - <- `REDIS_URL=${redis-url}`
+        - <- `CLICKHOUSE_HOST=${clickhouse-host}`
+        - <- `CLICKHOUSE_PORT=${clickhouse-port}`
+        - CLICKHOUSE_DATABASE=posthog
+        - CLICKHOUSE_SECURE=false
+        - CLICKHOUSE_VERIFY=false
+        - <- `KAFKA_HOSTS=${kafka-hosts}`
+        - OBJECT_STORAGE_ENABLED=false
+        - <- `OBJECT_STORAGE_ENDPOINT=${object-storage-endpoint}`
+        - SESSION_RECORDING_V2_S3_ENDPOINT=
+        - ENCRYPTION_SALT_KEYS=00beef0000beef0000beef0000beef00
+  services:
+    http:
+      container: web
+      port: 8000
+      protocol: tcp
+      publish: true
+      host-port: <- $http-port
+      description: Published local PostHog HTTP endpoint.
+  depends:
+    wait-for:
+      runnables:
+        - posthog/postgres
+        - posthog/redis
+        - posthog/clickhouse
+        - posthog/redpanda
+        - posthog/seaweedfs
+      timeout: 300
+
+stack:
+  defines: group
+  metadata:
+    name: PostHog stack
+    description: Standalone PostHog stack for local Monk verification with public images, private backing services, and one published HTTP endpoint.
+    tags: posthog,standalone,local
+  members:
+    - posthog/postgres
+    - posthog/redis
+    - posthog/redpanda
+    - posthog/clickhouse
+    - posthog/seaweedfs
+    - posthog/web
