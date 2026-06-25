@@ -26,6 +26,9 @@ interface RootContextValue {
     /** Inter-row spacing (px), applied as bottom padding on the measured row so heights include it. */
     gap: number
     maxWidthClassName: string
+    /** Inset applied to each row's content column (e.g. `px-4`). Lets an embedder pad rows off the scroll
+     *  edges without padding the scroll container — padding the container would inset the scrollbar too. */
+    rowClassName?: string
     /** When false, rows render in document flow (no react-window) and an ancestor owns scroll. */
     virtualized: boolean
 }
@@ -65,6 +68,8 @@ export interface VirtualizedThreadRootProps<T> {
     /** Follow the bottom as rows grow/append; unpins when the user scrolls up. */
     stickToBottom?: boolean
     maxWidthClassName?: string
+    /** Class applied to each row's content column (e.g. `px-4`) to inset rows off the scroll edges. */
+    rowClassName?: string
     className?: string
     /**
      * Virtualize and own scroll (default `true` — requires a height-bounded parent). Pass `false` to render
@@ -92,6 +97,7 @@ function Root<T>({
     overscanCount = 10,
     stickToBottom = true,
     maxWidthClassName = 'max-w-180',
+    rowClassName,
     className,
     listClassName,
     virtualized = true,
@@ -186,8 +192,8 @@ function Root<T>({
     }, [virtualized, stickToBottom, scrollToBottom])
 
     const rootValue = useMemo<RootContextValue>(
-        () => ({ dynamicRowHeight, gap, maxWidthClassName, virtualized }),
-        [dynamicRowHeight, gap, maxWidthClassName, virtualized]
+        () => ({ dynamicRowHeight, gap, maxWidthClassName, rowClassName, virtualized }),
+        [dynamicRowHeight, gap, maxWidthClassName, rowClassName, virtualized]
     )
 
     // Flow mode: render rows directly so an ancestor scroll container (and its auto-scroller) keeps working.
@@ -265,7 +271,7 @@ function Row({ children, className }: { children: ReactNode; className?: string 
     if (!root || !row) {
         throw new Error('VirtualizedThread.Row must be rendered inside VirtualizedThread.Root')
     }
-    const { dynamicRowHeight, gap, maxWidthClassName, virtualized } = root
+    const { dynamicRowHeight, gap, maxWidthClassName, rowClassName, virtualized } = root
     const { style, ariaAttributes, index } = row
     const rowRef = useRef<HTMLDivElement>(null)
 
@@ -289,7 +295,7 @@ function Row({ children, className }: { children: ReactNode; className?: string 
     return (
         <div ref={rowRef} style={style} data-index={index} {...ariaAttributes}>
             <div
-                className={cn('w-full mx-auto @container/thread', maxWidthClassName, className)}
+                className={cn('w-full mx-auto @container/thread', maxWidthClassName, rowClassName, className)}
                 style={{ paddingBottom: gap }}
             >
                 {children}

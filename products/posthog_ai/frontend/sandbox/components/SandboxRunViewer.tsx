@@ -28,6 +28,8 @@ export interface SandboxRunViewerProps {
      */
     interaction?: 'live' | 'read-only'
     className?: string
+    virtualizedWrapperClassName?: string
+    virtualizedListClassName?: string
     /**
      * Composer wiring — live mode only. Provide all of `composerValue`/`onComposerChange`/`onComposerSubmit`
      * to render the follow-up composer; the consumer owns the draft and the send (this module never POSTs
@@ -54,6 +56,8 @@ export function SandboxRunViewer({
     conversationId,
     interaction = 'read-only',
     className,
+    virtualizedWrapperClassName,
+    virtualizedListClassName,
     composerValue,
     onComposerChange,
     onComposerSubmit,
@@ -69,6 +73,8 @@ export function SandboxRunViewer({
                 rawRunId={runId}
                 interaction={interaction}
                 className={className}
+                virtualizedWrapperClassName={virtualizedWrapperClassName}
+                virtualizedListClassName={virtualizedListClassName}
                 composerValue={composerValue}
                 onComposerChange={onComposerChange}
                 onComposerSubmit={onComposerSubmit}
@@ -87,6 +93,8 @@ interface SandboxRunViewerContentProps {
     rawRunId: string
     interaction: 'live' | 'read-only'
     className?: string
+    virtualizedWrapperClassName?: string
+    virtualizedListClassName?: string
     composerValue?: string
     onComposerChange?: (value: string) => void
     onComposerSubmit?: () => void
@@ -100,6 +108,8 @@ function SandboxRunViewerContent({
     rawRunId,
     interaction,
     className,
+    virtualizedWrapperClassName,
+    virtualizedListClassName,
     composerValue,
     onComposerChange,
     onComposerSubmit,
@@ -137,22 +147,24 @@ function SandboxRunViewerContent({
             <Spinner className="text-2xl" />
         </div>
     ) : (
-        // An error surfaces as a `handleStreamError` item folded into the thread, so it renders here too.
-        <SandboxThreadView />
+        // Full-bleed scroll: the thread owns scroll edge-to-edge so its scrollbar sits flush with the embedding
+        // box's right border. The horizontal inset that keeps transcript content off the borders rides on the
+        // rows (`rowClassName`), not on this box — padding here would inset the scrollbar along with the content.
+        <SandboxThreadView
+            virtualized
+            className={virtualizedWrapperClassName}
+            listClassName={cn('py-4', virtualizedListClassName)}
+            rowClassName="px-4"
+        />
     )
 
     if (!isLive) {
-        return (
-            // The virtualized thread owns scroll and renders rows edge-to-edge; the padding here insets the
-            // scroll area so transcript content isn't glued to the embedding box's border. Overridable via
-            // `className` (tailwind-merge), e.g. an embedder that supplies its own padding.
-            <div className={cn('flex flex-col h-full min-h-0 w-full px-3 py-2', className)}>{thread}</div>
-        )
+        return <div className={cn('flex flex-col h-full min-h-0 w-full', className)}>{thread}</div>
     }
 
     return (
         <div className={cn('@container/thread flex flex-col h-full min-h-0 w-full overflow-hidden', className)}>
-            <div className="flex-1 min-h-0 px-3 py-2">{thread}</div>
+            <div className="flex-1 min-h-0">{thread}</div>
 
             <SandboxResourcesBar />
 

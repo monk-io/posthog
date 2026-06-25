@@ -31,7 +31,8 @@ export function SandboxThreadView({
     virtualized = true,
     className,
     listClassName,
-}: { virtualized?: boolean; className?: string; listClassName?: string } = {}): JSX.Element {
+    rowClassName,
+}: { virtualized?: boolean; className?: string; listClassName?: string; rowClassName?: string } = {}): JSX.Element {
     const { threadItems, toolInvocations, isThinking, streamPhase, runArtifacts, turnComplete, currentRunStatus } =
         useValues(sandboxStreamLogic)
     const turnCancelled = currentRunStatus === 'cancelled'
@@ -90,6 +91,7 @@ export function SandboxThreadView({
         <VirtualizedThread.Root
             className={className}
             listClassName={listClassName}
+            rowClassName={rowClassName}
             items={threadItems}
             getItemKey={getThreadItemKey}
             header={header}
