@@ -36,6 +36,8 @@ from products.slack_app.backend.services.slack_app_home import (
     MODAL_BLOCK_REASONING_EFFORT,
     MODAL_BLOCK_RUNTIME_ADAPTER,
     PreferenceSource,
+    TaskItem,
+    TasksState,
     handle_ai_preferences_block_action,
     handle_app_home_opened,
     handle_app_home_view_submission,
@@ -368,6 +370,80 @@ class TestRenderHomeView:
     def test_source_unset_when_neither_row_has_pair(self):
         assert resolve_source(None, None) == PreferenceSource.unset()
         assert resolve_source(_make_row(reasoning_effort="high"), None) == PreferenceSource.unset()
+
+
+class TestTasksCard:
+    def _kwargs(self, **overrides):
+        base = {
+            "effective": AIPreferences(),
+            "user_row": None,
+            "workspace_row": None,
+            "is_admin": False,
+        }
+        base.update(overrides)
+        return base
+
+    def _item(self, **overrides) -> TaskItem:
+        defaults = {
+            "title": "Fix flaky retention test",
+            "posthog_url": "https://app/project/1/tasks/abc",
+            "status": "in_progress",
+            "repository": "posthog/posthog",
+            "pr_url": "https://github.com/posthog/posthog/pull/123",
+        }
+        defaults.update(overrides)
+        return TaskItem(**defaults)
+
+    def test_card_hidden_when_state_is_none(self):
+        view = render_home_view(**self._kwargs())
+        assert "Tasks" not in _all_text(view)
+
+    def test_first_use_state_invites_user_to_mention(self):
+        # No mappings at all → has_any_tasks=False → no filter controls and a
+        # gentle nudge to mention the bot.
+        view = render_home_view(**self._kwargs(tasks_state=TasksState()))
+        text = _all_text(view)
+        assert "Tasks" in text
+        assert "Mention @PostHog" in text
+        assert "Refresh" not in text
+
+    def test_controls_and_list_render_when_any_tasks_exist(self):
+        state = TasksState(
+            items=(self._item(),),
+            available_repos=("posthog/posthog", "posthog/posthog-js"),
+            has_any_tasks=True,
+        )
+        view = render_home_view(**self._kwargs(tasks_state=state))
+        text = _all_text(view)
+        # Title + meta from the item.
+        assert "<https://app/project/1/tasks/abc|Fix flaky retention test>" in text
+        assert "posthog/posthog" in text
+        assert "In progress" in text
+        assert "View PR" in text
+        # Controls: refresh + repo dropdown (2 repos) + status dropdown.
+        assert "Refresh" in text
+
+    def test_repo_dropdown_hidden_when_only_one_repo(self):
+        state = TasksState(
+            items=(self._item(),),
+            available_repos=("posthog/posthog",),
+            has_any_tasks=True,
+        )
+        view = render_home_view(**self._kwargs(tasks_state=state))
+        # The dropdown action_id only renders when we draw the picker.
+        from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_FILTER_REPO
+
+        assert ACTION_TASKS_FILTER_REPO not in _action_ids(view)
+
+    def test_empty_filter_result_shows_no_match_copy(self):
+        state = TasksState(
+            items=(),
+            available_repos=("posthog/posthog",),
+            selected_status="failed",
+            has_any_tasks=True,
+        )
+        view = render_home_view(**self._kwargs(tasks_state=state))
+        assert "No tasks match" in _all_text(view)
 
 
 class TestRenderEditModal:
