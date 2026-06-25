@@ -2683,11 +2683,8 @@ describe('Workflows E2E: batch resolver dispatch via cdp-api', () => {
     })
 
     afterAll(async () => {
+        server?.close()
         await batchResolverProducer?.disconnect()
-        await api?.stop()
-        if (server) {
-            await new Promise<void>((resolve) => server.close(() => resolve()))
-        }
         await closeHub(hub)
         await cyclotronPool.end()
     })
