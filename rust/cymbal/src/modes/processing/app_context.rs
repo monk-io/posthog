@@ -14,7 +14,6 @@ use crate::{
     core::resolver::build_catalog,
     error::UnhandledError,
     modes::processing::config::{init_global_state, ProcessingConfig},
-    signals::{MaybeSignalClient, SignalClient},
     stages::resolution::remote::{
         dns::TokioDnsResolver, pool::EndpointPool, resolver::RemoteResolutionContext,
         RemoteResolutionConfig,
@@ -46,7 +45,6 @@ pub struct AppContext {
 
     pub team_manager: TeamManager,
     pub issue_buckets_redis_client: Arc<dyn RedisClientTrait + Send + Sync>,
-    pub signal_client: MaybeSignalClient,
     // Shared `(team_id, fingerprint) -> issue_id` mapping cache. Lives on AppContext so
     // it persists across requests — only the stable mapping is cached, never the Issue
     // itself, so suppression / reopen always see current PG state (see `IssueLinker`).
@@ -137,16 +135,6 @@ impl AppContext {
 
         let team_manager = TeamManager::new(config);
 
-        let signal_client = if config.signals_api_base_url.is_empty() {
-            MaybeSignalClient::disabled()
-        } else {
-            info!(
-                "Signal emission enabled, base_url={}",
-                config.signals_api_base_url
-            );
-            MaybeSignalClient::enabled(SignalClient::new(config))
-        };
-
         let symbol_resolver = Arc::new(LocalSymbolResolver::new(
             &config.resolver,
             catalog.clone(),
@@ -176,7 +164,6 @@ impl AppContext {
             process_request_limiter,
             team_manager,
             issue_buckets_redis_client,
-            signal_client,
             symbol_resolver,
             issue_cache,
             remote_resolution,
