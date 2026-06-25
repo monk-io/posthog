@@ -14,11 +14,11 @@ from structlog.types import FilteringBoundLogger
 
 from posthog.clickhouse.client import sync_execute
 from posthog.sync import database_sync_to_async_pool
-from posthog.temporal.data_imports.pipelines.pipeline.typings import SourceInputs
-from posthog.temporal.data_imports.pipelines.pipeline.utils import table_from_py_list
-from posthog.temporal.data_imports.util import NonRetryableException
 
 from products.data_warehouse.backend.s3 import aget_s3_client
+from products.warehouse_sources.backend.temporal.data_imports.pipelines.pipeline.typings import SourceInputs
+from products.warehouse_sources.backend.temporal.data_imports.pipelines.pipeline.utils import table_from_py_list
+from products.warehouse_sources.backend.temporal.data_imports.util import NonRetryableException
 
 # Statuses that indicate the webhook sender's request was rejected for a reason
 # the user must fix (e.g. a bad signing secret). 5xx (our fault), 429 (hog-watcher

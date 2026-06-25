@@ -16,7 +16,7 @@ import aioboto3
 import pyarrow.parquet as pq
 from parameterized import parameterized
 
-from posthog.temporal.data_imports.sources.common.webhook_s3 import WebhookSourceManager
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.webhook_s3 import WebhookSourceManager
 
 
 def _table_to_parquet_bytes(table: pa.Table) -> bytes:
@@ -58,7 +58,9 @@ def _make_manager(**input_overrides) -> WebhookSourceManager:
 @contextlib.contextmanager
 def _mock_s3_context(mock_s3: AsyncMock):
     """Patch aget_s3_client to yield a mock async context manager wrapping mock_s3."""
-    with patch("posthog.temporal.data_imports.sources.common.webhook_s3.aget_s3_client") as mock_get_s3:
+    with patch(
+        "products.warehouse_sources.backend.temporal.data_imports.sources.common.webhook_s3.aget_s3_client"
+    ) as mock_get_s3:
         mock_get_s3.return_value.__aenter__ = AsyncMock(return_value=mock_s3)
         mock_get_s3.return_value.__aexit__ = AsyncMock(return_value=False)
         yield mock_get_s3
@@ -78,7 +80,9 @@ class TestWebhookSourceManager:
     def test_get_webhook_s3_prefix(self):
         manager = _make_manager(team_id=42, schema_id="schema-abc")
 
-        with patch("posthog.temporal.data_imports.sources.common.webhook_s3.settings") as mock_settings:
+        with patch(
+            "products.warehouse_sources.backend.temporal.data_imports.sources.common.webhook_s3.settings"
+        ) as mock_settings:
             mock_settings.DATAWAREHOUSE_BUCKET = "my-bucket"
             result = manager._get_webhook_s3_prefix()
 
@@ -153,7 +157,7 @@ class TestWebhookSourceManager:
             return AsyncMock(return_value=has_webhook_function)
 
         with patch(
-            "posthog.temporal.data_imports.sources.common.webhook_s3.database_sync_to_async_pool",
+            "products.warehouse_sources.backend.temporal.data_imports.sources.common.webhook_s3.database_sync_to_async_pool",
             side_effect=mock_db_sync_to_async,
         ):
             assert await manager.webhook_enabled() is expected

@@ -20,42 +20,6 @@ from posthog.temporal.common.base import PostHogWorkflow
 from posthog.temporal.common.client import sync_connect
 from posthog.temporal.common.logger import get_logger
 from posthog.temporal.common.schedule import trigger_schedule_buffer_one
-from posthog.temporal.data_imports.metrics import get_data_import_finished_metric
-from posthog.temporal.data_imports.row_tracking import finish_row_tracking, get_rows
-from posthog.temporal.data_imports.sources import SourceRegistry
-from posthog.temporal.data_imports.sources.common.base import ResumableSource
-from posthog.temporal.data_imports.workflow_activities.acquire_v3_lock import (
-    AcquireV3LockActivityInputs,
-    CheckPipelineVersionActivityInputs,
-    ReleaseV3LockActivityInputs,
-    acquire_v3_pipeline_lock_activity,
-    check_pipeline_version_activity,
-    release_v3_pipeline_lock_activity,
-)
-from posthog.temporal.data_imports.workflow_activities.calculate_table_size import (
-    CalculateTableSizeActivityInputs,
-    calculate_table_size_activity,
-)
-from posthog.temporal.data_imports.workflow_activities.check_billing_limits import (
-    CheckBillingLimitsActivityInputs,
-    check_billing_limits_activity,
-)
-from posthog.temporal.data_imports.workflow_activities.create_job_model import (
-    CreateExternalDataJobModelActivityInputs,
-    create_external_data_job_model_activity,
-)
-from posthog.temporal.data_imports.workflow_activities.emit_signals import (
-    EmitDataImportSignalsWorkflow,
-    EmitSignalsActivityInputs,
-)
-from posthog.temporal.data_imports.workflow_activities.enrich_table_semantics import (
-    EnrichTableSemanticsInputs,
-    EnrichTableSemanticsWorkflow,
-)
-from posthog.temporal.data_imports.workflow_activities.import_data_sync import (
-    ImportDataActivityInputs,
-    import_data_activity_sync,
-)
 from posthog.temporal.ducklake.ducklake_copy_data_imports_workflow import (
     DataImportsDuckLakeCopyInputs,
     DuckLakeCopyDataImportsWorkflow,
@@ -66,10 +30,43 @@ from posthog.utils import get_machine_id
 from products.data_warehouse.backend.data_load.service import a_unpause_external_data_schedule
 from products.data_warehouse.backend.data_load.source_templates import create_warehouse_templates_for_source
 from products.data_warehouse.backend.external_data_source.jobs import update_external_job_status
-from products.data_warehouse.backend.types import ExternalDataSourceType
+from products.signals.backend.emission.emit_signals import EmitDataImportSignalsWorkflow, EmitSignalsActivityInputs
 from products.warehouse_sources.backend.models.external_data_job import ExternalDataJob
 from products.warehouse_sources.backend.models.external_data_schema import ExternalDataSchema, update_should_sync
 from products.warehouse_sources.backend.models.external_data_source import ExternalDataSource
+from products.warehouse_sources.backend.temporal.data_imports.metrics import get_data_import_finished_metric
+from products.warehouse_sources.backend.temporal.data_imports.row_tracking import finish_row_tracking, get_rows
+from products.warehouse_sources.backend.temporal.data_imports.sources import SourceRegistry
+from products.warehouse_sources.backend.temporal.data_imports.sources.common.base import ResumableSource
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.acquire_v3_lock import (
+    AcquireV3LockActivityInputs,
+    CheckPipelineVersionActivityInputs,
+    ReleaseV3LockActivityInputs,
+    acquire_v3_pipeline_lock_activity,
+    check_pipeline_version_activity,
+    release_v3_pipeline_lock_activity,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.calculate_table_size import (
+    CalculateTableSizeActivityInputs,
+    calculate_table_size_activity,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.check_billing_limits import (
+    CheckBillingLimitsActivityInputs,
+    check_billing_limits_activity,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.create_job_model import (
+    CreateExternalDataJobModelActivityInputs,
+    create_external_data_job_model_activity,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.enrich_table_semantics import (
+    EnrichTableSemanticsInputs,
+    EnrichTableSemanticsWorkflow,
+)
+from products.warehouse_sources.backend.temporal.data_imports.workflow_activities.import_data_sync import (
+    ImportDataActivityInputs,
+    import_data_activity_sync,
+)
+from products.warehouse_sources.backend.types import ExternalDataSourceType
 
 LOGGER = get_logger(__name__)
 
