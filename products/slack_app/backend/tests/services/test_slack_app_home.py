@@ -441,6 +441,31 @@ class TestTasksCard:
         assert "<https://github.com/posthog/posthog/pull/123|PR>" in first
         assert "_Updated 5m ago_" in first
 
+    def test_failed_task_surfaces_error_message_on_row_two(self):
+        state = TasksState(
+            items=(
+                self._item(
+                    status="failed",
+                    pr_url=None,
+                    error_message="boom: timed out waiting for runner\nstack trace omitted",
+                ),
+            ),
+            has_any_tasks=True,
+            page=0,
+            total_pages=1,
+            total_filtered=1,
+        )
+        view = render_home_view(**self._kwargs(tasks_state=state))
+        text = self._task_item_sections(view, expected_count=1)[0]["text"]["text"]
+        # Newlines in the upstream message collapse to spaces so the row
+        # doesn't blow open vertically.
+        assert "`boom: timed out waiting for runner stack trace omitted`" in text
+        # Repo / PR / updated-at meta are replaced by the error message; only
+        # the Thread link tags along so the user can jump in to debug.
+        assert "`posthog/posthog`" not in text
+        assert "_Updated 5m ago_" not in text
+        assert "<https://slack.com/archives/C1/p1234567890123456|Thread>" in text
+
     def test_task_with_no_repo_or_pr_skips_those_meta_parts(self):
         state = TasksState(
             items=(self._item(repository=None, pr_url=None),),
@@ -489,7 +514,7 @@ class TestTasksCard:
         assert sections == []
 
     def test_pagination_buttons_render_with_target_pages(self):
-        from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_PAGE
+        from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_PAGE_NEXT, ACTION_TASKS_PAGE_PREV
 
         state = TasksState(
             items=(self._item(),),
@@ -499,13 +524,17 @@ class TestTasksCard:
             total_filtered=42,
         )
         view = render_home_view(**self._kwargs(tasks_state=state))
+        # Prev and Next sit side-by-side under distinct action_ids so Slack
+        # doesn't reject the view for action_id collision.
         pagination = next(
             b
             for b in view["blocks"]
-            if b.get("type") == "actions" and all(el.get("action_id") == ACTION_TASKS_PAGE for el in b["elements"])
+            if b.get("type") == "actions"
+            and {el.get("action_id") for el in b["elements"]} == {ACTION_TASKS_PAGE_PREV, ACTION_TASKS_PAGE_NEXT}
         )
-        values_present = [el.get("value") for el in pagination["elements"]]
-        assert values_present == ["0", "2"]
+        by_action = {el["action_id"]: el for el in pagination["elements"]}
+        assert by_action[ACTION_TASKS_PAGE_PREV]["value"] == "0"
+        assert by_action[ACTION_TASKS_PAGE_NEXT]["value"] == "2"
         # Page indicator + result count render as a context block above.
         text = _all_text(view)
         assert "Page" in text and "2" in text and "of" in text and "3" in text
@@ -514,9 +543,11 @@ class TestTasksCard:
     def test_pagination_hidden_when_only_one_page(self):
         state = TasksState(items=(self._item(),), has_any_tasks=True, page=0, total_pages=1, total_filtered=1)
         view = render_home_view(**self._kwargs(tasks_state=state))
-        from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_PAGE
+        from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_PAGE_NEXT, ACTION_TASKS_PAGE_PREV
 
-        assert ACTION_TASKS_PAGE not in _action_ids(view)
+        action_ids = _action_ids(view)
+        assert ACTION_TASKS_PAGE_PREV not in action_ids
+        assert ACTION_TASKS_PAGE_NEXT not in action_ids
 
     def test_refresh_button_in_controls_carries_current_page(self):
         from products.slack_app.backend.services.slack_app_home import ACTION_TASKS_REFRESH

@@ -16,7 +16,7 @@ in `products/slack_app/backend/api.py` are the ones that actually call
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Literal
 
 from django.core.exceptions import ValidationError
@@ -56,7 +56,10 @@ ACTION_RESET_PROJECT_PERSONAL = "slack_app_home:reset_project_personal"
 ACTION_TASKS_FILTER_REPO = "slack_app_home:tasks_filter_repo"
 ACTION_TASKS_FILTER_STATUS = "slack_app_home:tasks_filter_status"
 ACTION_TASKS_REFRESH = "slack_app_home:tasks_refresh"
-ACTION_TASKS_PAGE = "slack_app_home:tasks_page"
+# Slack requires every action_id to be unique within a view, so Prev/Next
+# can't share one id — they both carry the target page as `value`.
+ACTION_TASKS_PAGE_PREV = "slack_app_home:tasks_page_prev"
+ACTION_TASKS_PAGE_NEXT = "slack_app_home:tasks_page_next"
 
 # Single block_id for the whole controls row. Block Kit only persists
 # state in `view.state.values` under blocks that carry a `block_id`, so
@@ -282,7 +285,7 @@ class ProjectState:
 
 @dataclass(frozen=True)
 class TaskItem:
-    """One row in the Tasks data_table."""
+    """One row on the Tasks card."""
 
     title: str
     posthog_url: str
@@ -291,6 +294,7 @@ class TaskItem:
     pr_url: str | None
     thread_url: str | None
     updated_at_label: str
+    error_message: str | None = None  # surfaced on row 2 in place of the normal meta line
 
 
 @dataclass(frozen=True)
@@ -366,18 +370,18 @@ def render_home_view(
     blocks.extend(_personal_section_blocks(user_row))
     blocks.extend(_workspace_section_blocks(workspace_row, is_admin=is_admin))
 
-    # Section 3 — your tasks: a quiet list of tasks the calling user
+    # Section 3 — account linking: shown before Tasks so the connect
+    # prompt is visible while the Tasks list is still empty. Flag-gated.
+    if account_state and account_state.enabled:
+        blocks.append({"type": "divider"})
+        blocks.extend(_account_section_blocks(account_state))
+
+    # Section 4 — your tasks: a quiet list of tasks the calling user
     # started via @PostHog mentions, so they can see status without
     # the bot pinging the activity feed for every transition.
     if tasks_state is not None:
         blocks.append({"type": "divider"})
         blocks.extend(_tasks_section_blocks(tasks_state))
-
-    # Section 4 — account linking: tucked at the end because it's a setup
-    # step you do once, not a knob you tune. Flag-gated.
-    if account_state and account_state.enabled:
-        blocks.append({"type": "divider"})
-        blocks.extend(_account_section_blocks(account_state))
 
     blocks.append({"type": "divider"})
     blocks.extend(_footer_blocks())
@@ -709,11 +713,26 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
 def _task_item_block(item: TaskItem) -> dict:
     """One task row: bold linked title + dimmed meta line beneath.
 
-    Uses `\\n\\n` between title and meta so Slack renders a paragraph break
-    (extra vertical breathing room) rather than a tight single-line break.
+    When the task carries an error message, row 2 surfaces the actual error
+    (with the Thread link tacked on so the user can jump in to investigate).
+    Otherwise row 2 is the standard status · repo · thread · PR · updated meta.
+
+    `\\n\\n` between rows so Slack renders a paragraph break (extra vertical
+    breathing room) rather than a tight single-line break.
     """
     status_label = _TASK_STATUS_LABELS.get(item.status or "", "")
     title_line = f"*<{item.posthog_url}|{item.title}>*" if item.posthog_url else f"*{item.title}*"
+
+    if item.error_message:
+        # Strip leading/trailing whitespace and collapse internal newlines so
+        # an upstream traceback doesn't blow the row open.
+        err = " ".join(item.error_message.strip().split())
+        parts = [status_label] if status_label else []
+        parts.append(f"`{err}`")
+        if item.thread_url:
+            parts.append(f"<{item.thread_url}|Thread>")
+        return {"type": "section", "text": {"type": "mrkdwn", "text": f"{title_line}\n\n{' · '.join(parts)}"}}
+
     meta_parts: list[str] = []
     if status_label:
         meta_parts.append(status_label)
@@ -744,7 +763,7 @@ def _tasks_pagination_blocks(state: TasksState) -> list[dict]:
         elements.append(
             {
                 "type": "button",
-                "action_id": ACTION_TASKS_PAGE,
+                "action_id": ACTION_TASKS_PAGE_PREV,
                 "value": str(state.page - 1),
                 "text": {"type": "plain_text", "text": "← Previous", "emoji": True},
             }
@@ -753,7 +772,7 @@ def _tasks_pagination_blocks(state: TasksState) -> list[dict]:
         elements.append(
             {
                 "type": "button",
-                "action_id": ACTION_TASKS_PAGE,
+                "action_id": ACTION_TASKS_PAGE_NEXT,
                 "value": str(state.page + 1),
                 "text": {"type": "plain_text", "text": "Next →", "emoji": True},
             }
@@ -1106,12 +1125,13 @@ def handle_ai_preferences_block_action(payload: dict, action: dict) -> HttpRespo
         ACTION_TASKS_FILTER_REPO,
         ACTION_TASKS_FILTER_STATUS,
         ACTION_TASKS_REFRESH,
-        ACTION_TASKS_PAGE,
+        ACTION_TASKS_PAGE_PREV,
+        ACTION_TASKS_PAGE_NEXT,
     ):
         selected_repo, selected_status = _read_tasks_filters_from_payload(payload)
-        # Filter changes snap back to page 0; Refresh/Page carry the target
-        # page as the button value so the Home tab stays stateless.
-        if action_id in (ACTION_TASKS_REFRESH, ACTION_TASKS_PAGE):
+        # Filter changes snap back to page 0; Refresh / Prev / Next carry the
+        # target page as the button value so the Home tab stays stateless.
+        if action_id in (ACTION_TASKS_REFRESH, ACTION_TASKS_PAGE_PREV, ACTION_TASKS_PAGE_NEXT):
             try:
                 page = max(0, int(action.get("value") or "0"))
             except (TypeError, ValueError):
@@ -1405,6 +1425,10 @@ def _republish_home(
 
 _TASKS_PAGE_SIZE = 10
 _TASKS_MAX_TOTAL = 200
+# Tasks fall off the Home tab once their Slack thread has been quiet for a
+# week. Keeps the list tight and avoids dragging in stale work that the user
+# already moved past in the PostHog UI.
+_TASKS_RECENT_WINDOW = timedelta(days=7)
 
 
 def _resolve_tasks_state(
@@ -1433,10 +1457,12 @@ def _resolve_tasks_state(
     slack_team_id = integration.integration_id
     # `-updated_at` advances on each thread reply, so "latest activity"
     # surfaces first. We don't expose a sort control today.
+    recent_cutoff = django_timezone.now() - _TASKS_RECENT_WINDOW
     mappings = list(
         SlackThreadTaskMapping.objects.filter(
             slack_workspace_id=slack_team_id,
             mentioning_slack_user_id=slack_user_id,
+            updated_at__gte=recent_cutoff,
         )
         .order_by("-updated_at")
         .values("task_id", "team_id", "channel", "thread_ts", "updated_at")[:_TASKS_MAX_TOTAL]
@@ -1487,6 +1513,7 @@ def _resolve_tasks_state(
                 pr_url=pr_urls_by_task.get(str(t.id)),
                 thread_url=_slack_thread_permalink(mapping.get("channel", ""), mapping.get("thread_ts", "")),
                 updated_at_label=_format_relative(mapping.get("updated_at"), now=now),
+                error_message=run.error_message if run else None,
             )
         )
         if t.repository and t.repository not in seen_repo_set:
