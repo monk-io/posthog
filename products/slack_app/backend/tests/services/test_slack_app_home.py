@@ -441,12 +441,11 @@ class TestTasksCard:
         assert "<https://github.com/posthog/posthog/pull/123|PR>" in first
         assert "_Updated 5m ago_" in first
 
-    def test_failed_task_surfaces_error_message_on_row_two(self):
+    def test_failed_task_renders_title_then_error_then_meta(self):
         state = TasksState(
             items=(
                 self._item(
                     status="failed",
-                    pr_url=None,
                     error_message="boom: timed out waiting for runner\nstack trace omitted",
                 ),
             ),
@@ -457,14 +456,20 @@ class TestTasksCard:
         )
         view = render_home_view(**self._kwargs(tasks_state=state))
         text = self._task_item_sections(view, expected_count=1)[0]["text"]["text"]
+        rows = text.split("\n\n")
+        # Row 1 title, row 2 the collapsed error message, row 3 the standard
+        # status/repo/thread/PR/updated meta — the error never replaces the
+        # surrounding context.
+        assert len(rows) == 3
+        assert rows[0] == "*<https://app/project/1/tasks/abc|Fix flaky retention test>*"
         # Newlines in the upstream message collapse to spaces so the row
         # doesn't blow open vertically.
-        assert "`boom: timed out waiting for runner stack trace omitted`" in text
-        # Repo / PR / updated-at meta are replaced by the error message; only
-        # the Thread link tags along so the user can jump in to debug.
-        assert "`posthog/posthog`" not in text
-        assert "_Updated 5m ago_" not in text
-        assert "<https://slack.com/archives/C1/p1234567890123456|Thread>" in text
+        assert rows[1] == "`boom: timed out waiting for runner stack trace omitted`"
+        assert "❌ Failed" in rows[2]
+        assert "`posthog/posthog`" in rows[2]
+        assert "<https://slack.com/archives/C1/p1234567890123456|Thread>" in rows[2]
+        assert "<https://github.com/posthog/posthog/pull/123|PR>" in rows[2]
+        assert "_Updated 5m ago_" in rows[2]
 
     def test_task_with_no_repo_or_pr_skips_those_meta_parts(self):
         state = TasksState(

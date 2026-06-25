@@ -711,27 +711,18 @@ def _tasks_section_blocks(state: TasksState) -> list[dict]:
 
 
 def _task_item_block(item: TaskItem) -> dict:
-    """One task row: bold linked title + dimmed meta line beneath.
+    """One task row: bold linked title, optional error line, then meta.
 
-    When the task carries an error message, row 2 surfaces the actual error
-    (with the Thread link tacked on so the user can jump in to investigate).
-    Otherwise row 2 is the standard status · repo · thread · PR · updated meta.
+    Failed tasks render three rows — title, the actual error message, and the
+    standard status · repo · thread · PR · updated meta — so the user sees what
+    broke without losing the surrounding context. Happy-path tasks collapse
+    back to title + meta.
 
     `\\n\\n` between rows so Slack renders a paragraph break (extra vertical
     breathing room) rather than a tight single-line break.
     """
     status_label = _TASK_STATUS_LABELS.get(item.status or "", "")
     title_line = f"*<{item.posthog_url}|{item.title}>*" if item.posthog_url else f"*{item.title}*"
-
-    if item.error_message:
-        # Strip leading/trailing whitespace and collapse internal newlines so
-        # an upstream traceback doesn't blow the row open.
-        err = " ".join(item.error_message.strip().split())
-        parts = [status_label] if status_label else []
-        parts.append(f"`{err}`")
-        if item.thread_url:
-            parts.append(f"<{item.thread_url}|Thread>")
-        return {"type": "section", "text": {"type": "mrkdwn", "text": f"{title_line}\n\n{' · '.join(parts)}"}}
 
     meta_parts: list[str] = []
     if status_label:
@@ -744,8 +735,16 @@ def _task_item_block(item: TaskItem) -> dict:
         meta_parts.append(f"<{item.pr_url}|PR>")
     if item.updated_at_label:
         meta_parts.append(f"_Updated {item.updated_at_label}_")
-    text = title_line if not meta_parts else f"{title_line}\n\n{' · '.join(meta_parts)}"
-    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+    rows = [title_line]
+    if item.error_message:
+        # Collapse internal whitespace/newlines so an upstream traceback
+        # doesn't blow the row open vertically.
+        err = " ".join(item.error_message.strip().split())
+        rows.append(f"`{err}`")
+    if meta_parts:
+        rows.append(" · ".join(meta_parts))
+    return {"type": "section", "text": {"type": "mrkdwn", "text": "\n\n".join(rows)}}
 
 
 def _tasks_pagination_blocks(state: TasksState) -> list[dict]:
