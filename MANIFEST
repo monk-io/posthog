@@ -1,0 +1,5 @@
+REPO posthog
+
+LOAD monk/posthog.yaml
+
+ENTRY posthog/stack
