@@ -343,7 +343,6 @@ web:
       container: web
       port: 8000
       protocol: tcp
-      publish: true
       host-port: <- $http-port
       description: Published local PostHog HTTP endpoint.
   depends:
