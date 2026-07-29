@@ -72,7 +72,7 @@
         "oxfmt": "catalog:",
         "oxlint": "^1.8.0",
         "playwright": "1.60.0",
-        "postcss": "^8.5.15",
+        "postcss": "^8.5.18",
         "postcss-preset-env": "^10.1.4",
         "stylelint": "^15.11.0",
         "stylelint-config-recess-order": "^4.6.0",
