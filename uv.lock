@@ -1602,22 +1602,21 @@ wheels = [
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.36.0"
+version = "0.64.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
-    { name = "black" },
+    { name = "black", marker = "sys_platform != 'emscripten'" },
     { name = "genson" },
     { name = "inflect" },
-    { name = "isort" },
+    { name = "isort", marker = "sys_platform != 'emscripten'" },
     { name = "jinja2" },
-    { name = "packaging" },
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/99/4a/3d17b5ca93e3296af39e33464f357c278d01c65786f537784d292e3c719a/datamodel_code_generator-0.36.0.tar.gz", hash = "sha256:1a70d0fa7648551d48b800dbe9b249582b9362eac084f01a643534338ccc3fdf", size = 390410, upload-time = "2025-11-26T17:14:08.443Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9c/d2/86c94a2836ed42231653a7ddaefa0a5bc23418167a876bba7376c96b3a35/datamodel_code_generator-0.64.0.tar.gz", hash = "sha256:9c592900a00b20e416494273c22435f5a9aef6ea8c7b9190747522a60497a1cb", size = 1316440, upload-time = "2026-06-14T17:24:50.528Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/24/471d91e77895d03109354efe5ba7f5c2c4fadecfc030f975bfb320029169/datamodel_code_generator-0.36.0-py3-none-any.whl", hash = "sha256:7d9b11cbf309b65cc9d13560ee22a75feb8d7e63ed8e305fe58dee6150eb6f5b", size = 127352, upload-time = "2025-11-26T17:14:06.816Z" },
+    { url = "https://files.pythonhosted.org/packages/23/94/71338e2f0146ac10747a5537b3a1e45256e66b7c229869eb0ee787111b41/datamodel_code_generator-0.64.0-py3-none-any.whl", hash = "sha256:b7cd8bd41a312aa997aec6150670bad781847c5b674f17e4d70e78208a0fb990", size = 374698, upload-time = "2026-06-14T17:24:48.809Z" },
 ]
 
 [[package]]
@@ -5979,7 +5978,7 @@ dev = [
     { name = "braintrust-langchain", specifier = "==0.0.4" },
     { name = "browser-cookie3", specifier = "~=0.20" },
     { name = "dagster-dg-cli", specifier = "~=1.10.18" },
-    { name = "datamodel-code-generator", specifier = "~=0.36.0" },
+    { name = "datamodel-code-generator", specifier = "~=0.64.0" },
     { name = "debugpy", specifier = "~=1.8.0" },
     { name = "deepdiff", specifier = "~=8.6.1" },
     { name = "django-linear-migrations", specifier = "~=2.17.0" },
