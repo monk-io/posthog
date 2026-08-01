@@ -25,7 +25,7 @@
         "eslint-config-next": "15.5.18",
         "pg": "^8.16.3",
         "playwright": "^1.40.0",
-        "postcss": "^8.5.15",
+        "postcss": "^8.5.18",
         "tailwindcss": "^3.3.0",
         "typescript": "^5"
     },
