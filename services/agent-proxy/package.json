@@ -15,7 +15,7 @@
     "dependencies": {
         "@hono/node-server": "^2.0.2",
         "esbuild": "^0.25.11",
-        "hono": "^4.12.18",
+        "hono": "^4.12.34",
         "ioredis": "^4.28.5",
         "jose": "^6.0.10",
         "pino": "^8.6.0",
