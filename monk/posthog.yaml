@@ -27,8 +27,12 @@ postgres:
         - <- `POSTGRES_USER=${postgres-user}`
         - <- `POSTGRES_DB=${postgres-database}`
         - POSTGRES_HOST_AUTH_METHOD=trust
-      paths:
-        - <- `${monk-volume-path}/posthog/postgres:/var/lib/postgresql/data`
+      mounted-volumes:
+        postgres-data:
+          path: /var/lib/postgresql/data
+  volumes:
+    postgres-data:
+      kind: local
   services:
     postgres:
       container: postgres
@@ -56,8 +60,12 @@ redis:
       image: docker.io/library/redis
       image-tag: <- $redis-image-tag
       bash: <- `redis-server --maxmemory-policy allkeys-lru --maxmemory ${redis-maxmemory}`
-      paths:
-        - <- `${monk-volume-path}/posthog/redis:/data`
+      mounted-volumes:
+        redis-data:
+          path: /data
+  volumes:
+    redis-data:
+      kind: local
   services:
     redis:
       container: redis
@@ -104,8 +112,12 @@ clickhouse:
         - CLICKHOUSE_SKIP_USER_SETUP=1
         - <- `CLICKHOUSE_DB=${clickhouse-database}`
         - <- `KAFKA_HOSTS=${kafka-hosts}`
-      paths:
-        - <- `${monk-volume-path}/posthog/clickhouse:/var/lib/clickhouse`
+      mounted-volumes:
+        clickhouse-data:
+          path: /var/lib/clickhouse
+  volumes:
+    clickhouse-data:
+      kind: local
   services:
     http:
       container: clickhouse
@@ -139,8 +151,12 @@ redpanda:
       image: docker.io/redpandadata/redpanda
       image-tag: <- $redpanda-image-tag
       bash: redpanda start --kafka-addr internal://0.0.0.0:9092 --advertise-kafka-addr internal://127.0.0.1:9092 --rpc-addr 0.0.0.0:33145 --advertise-rpc-addr 127.0.0.1:33145 --pandaproxy-addr 0.0.0.0:8082 --schema-registry-addr 0.0.0.0:8081 --mode dev-container --smp 1 --memory 1G --reserve-memory 0M --overprovisioned --set redpanda.auto_create_topics_enabled=true
-      paths:
-        - <- `${monk-volume-path}/posthog/redpanda:/var/lib/redpanda/data`
+      mounted-volumes:
+        redpanda-data:
+          path: /var/lib/redpanda/data
+  volumes:
+    redpanda-data:
+      kind: local
   services:
     kafka:
       container: redpanda
@@ -169,8 +185,12 @@ seaweedfs:
       image: docker.io/chrislusf/seaweedfs
       image-tag: <- $seaweedfs-image-tag
       bash: weed server -dir=/data -s3 -s3.port=8333 -master.port=9333 -volume.port=8081 -ip=0.0.0.0
-      paths:
-        - <- `${monk-volume-path}/posthog/seaweedfs:/data`
+      mounted-volumes:
+        seaweedfs-data:
+          path: /data
+  volumes:
+    seaweedfs-data:
+      kind: local
   services:
     s3:
       container: seaweedfs
